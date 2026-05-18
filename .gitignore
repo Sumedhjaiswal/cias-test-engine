@@ -1,0 +1,47 @@
+# ── WordPress ────────────────────────────────────────────────
+wp-config.php
+wp-content/uploads/
+*.log
+
+# ── Plugin-specific secrets ───────────────────────────────────
+# Never commit API keys or credentials
+/config/secrets.php
+/config/local.php
+.env
+.env.local
+
+# ── Build artifacts ───────────────────────────────────────────
+node_modules/
+vendor/
+*.zip
+*.tar.gz
+
+# ── OS files ──────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+
+# ── IDE files ─────────────────────────────────────────────────
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# ── PHP ───────────────────────────────────────────────────────
+*.bak
+*.cache
+/cache/
+
+# ── Temporary worker files ────────────────────────────────────
+/phase-b/workers/*.pid
+/phase-b/workers/*.lock
+
+# ── Database dumps ────────────────────────────────────────────
+*.sql
+*.dump
