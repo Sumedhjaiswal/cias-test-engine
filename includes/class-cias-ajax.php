@@ -278,6 +278,15 @@ class CIAS_Ajax {
         $attempt_id = intval($_POST['attempt_id'] ?? 0);
         if (!$attempt_id) wp_send_json_error(['message'=>'Invalid attempt.']);
 
+        // ── Ownership validation — ensure attempt belongs to current user ──
+        global $wpdb;
+        $owner = (int) $wpdb->get_var(
+            $wpdb->prepare( "SELECT user_id FROM " . CIAS_ATTEMPTS . " WHERE id = %d", $attempt_id )
+        );
+        if ( $owner !== $uid ) {
+            wp_send_json_error(['message' => 'Unauthorized.'], 403);
+        }
+
         $db     = new CIAS_DB();
         $result = $db->submit_attempt($attempt_id, $uid);
         $pass   = intval(get_option('cias_pass_percentage', 60));
