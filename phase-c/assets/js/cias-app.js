@@ -60,6 +60,19 @@ var CIASApp = (function () {
     if (!D.user) return;
     sessionId = 'ses_' + D.user.id + '_' + Date.now().toString(36);
 
+    // ── Init API + Chat modules FIRST (before any render calls) ────────────
+    CIAS_API.init(D);
+
+    CIASChat.init({
+      data:      D,
+      el:        el,
+      esc:       esc,
+      nowTime:   nowTime,
+      setText:   setText,
+      goTab:     goTab,
+      sessionId: sessionId,
+    });
+
     populateTopbar();
     populateHome();
     populateVocab();
@@ -72,20 +85,6 @@ var CIASApp = (function () {
     renderInitialChat();
 
     goTab('home');
-
-    // ── Init API module (core/api.js) ────────────────────────────────────
-    CIAS_API.init(D);
-
-    // ── Init Chat module (chat.js) ────────────────────────────────────────
-    CIASChat.init({
-      data:      D,
-      el:        el,
-      esc:       esc,
-      nowTime:   nowTime,
-      setText:   setText,
-      goTab:     goTab,
-      sessionId: sessionId,
-    });
   }
 
   /* ── Topbar ───────────────────────────────────────────────── */
