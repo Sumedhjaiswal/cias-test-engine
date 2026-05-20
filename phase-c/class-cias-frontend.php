@@ -23,7 +23,7 @@ class CIAS_Frontend {
         add_action( 'wp_ajax_cias_job_poll', [ __CLASS__, 'ajax_job_poll' ] );
 
         // AJAX: direct guru chat fallback (when REST job path fails)
-        add_action( 'wp_ajax_cias_guru_direct', [ __CLASS__, 'ajax_guru_direct' ] );
+        // wp_ajax_cias_guru_direct removed — sync AI calls not permitted (ARCHITECTURE.md)
 
         // Redirect non-logged-in users from app page
         add_action( 'template_redirect', [ __CLASS__, 'maybe_redirect_login' ] );
@@ -105,10 +105,20 @@ class CIAS_Frontend {
             CIAS_PHASE_C_VERSION
         );
 
+        // chat.js — AI Guru module. Must load BEFORE cias-app.js
+        wp_enqueue_script(
+            'cias-chat',
+            CIAS_PHASE_C_URL . 'assets/js/chat.js',
+            [],
+            CIAS_PHASE_C_VERSION,
+            true
+        );
+
+        // cias-app.js depends on CIASChat being defined by chat.js
         wp_enqueue_script(
             'cias-app',
             CIAS_PHASE_C_URL . 'assets/js/cias-app.js',
-            [],
+            [ 'cias-chat' ],
             CIAS_PHASE_C_VERSION,
             true
         );
@@ -183,46 +193,10 @@ class CIAS_Frontend {
         ] );
     }
 
-    // ── AJAX: Direct guru chat fallback ──────────────────────────────────────
-    // Called when the async REST/job path fails. Calls Claude synchronously.
+    // ajax_guru_direct removed — sync AI calls are not permitted.
+    // All Guru chat goes through: POST /guru/chat (REST) → job queue → worker → poll
+    // See ARCHITECTURE.md: "NEVER wait synchronously for Claude/OpenAI responses"
 
-    public static function ajax_guru_direct(): void {
-        check_ajax_referer( 'cias_app_nonce', 'nonce' );
-        $user_id    = get_current_user_id();
-        $question   = sanitize_textarea_field( $_POST['message'] ?? '' );
-        $session_id = sanitize_text_field( $_POST['session_id'] ?? '' );
-
-        if ( ! $user_id || empty( $question ) ) {
-            wp_send_json_error( ['message' => 'Invalid request.'], 400 );
-        }
-
-        if ( ! class_exists( 'CAIG_AI' ) || ! class_exists( 'CAIG_Data' ) ) {
-            wp_send_json_error( ['message' => 'AI not available.'], 503 );
-        }
-
-        $profile  = CAIG_Data::get_profile( $user_id );
-        $response = CAIG_AI::guru_chat( $profile, $question, [] );
-
-        if ( empty( $response ) ) {
-            wp_send_json_error( ['message' => 'Could not generate a response. Please try again.'], 500 );
-        }
-
-        do_action( 'cias_guru_user_message', [
-            'session_id' => $session_id ?: 'direct_' . $user_id,
-            'user_id'    => $user_id,
-            'body'       => $question,
-            'image_data' => null, 'image_mime' => null, 'image_name' => null,
-            'tokens'     => null, 'credits'    => null,
-        ] );
-        do_action( 'cias_guru_assistant_message', [
-            'session_id' => $session_id ?: 'direct_' . $user_id,
-            'user_id'    => $user_id,
-            'body'       => $response,
-            'tokens'     => null,
-        ] );
-
-        wp_send_json_success( ['response' => $response, 'session_id' => $session_id] );
-    }
 
     // ── AJAX: Job status poll (wraps Phase B REST for non-REST clients) ───────
 
