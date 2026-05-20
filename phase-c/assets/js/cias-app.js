@@ -619,10 +619,17 @@ var CIASApp = (function () {
         timeLimitMin:d.time_limit,
         passmark:    d.pass_mark || 60,
       };
-      setText('exam-title', d.test_title);
-      buildQNav();
-      renderQuestion(0);
-      startExamTimer();
+      if (el('exam-title')) {
+        setText('exam-title', d.test_title);
+        buildQNav();
+        renderQuestion(0);
+        startExamTimer();
+      } else {
+        // Exam screen not found — redirect to portal page
+        CIAS_API.logError('beginExam', 'Exam screen elements not found in DOM', 'error');
+        alert('Please use the app at vocabulary-practice page to take tests.');
+        goTab('tests');
+      }
     });
   }
 
