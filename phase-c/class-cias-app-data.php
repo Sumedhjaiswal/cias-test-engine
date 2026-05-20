@@ -45,6 +45,7 @@ class CIAS_App_Data {
             'study_plan_today'   => self::get_study_plan_today( $user_id ),
             'rank'               => self::get_leaderboard_rank( $user_id ),
             'nonce'       => wp_create_nonce( 'cias_app_nonce' ),
+            'rest_nonce'  => wp_create_nonce( 'wp_rest' ),
             'rest_url'    => esc_url_raw( rest_url( 'cias/v1' ) ),
             'ajax_url'    => admin_url( 'admin-ajax.php' ),
             'r2_configured' => defined('CIAS_R2_ACCOUNT_ID') && CIAS_R2_ACCOUNT_ID ? true : false,
