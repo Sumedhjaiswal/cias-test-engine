@@ -739,7 +739,7 @@ class CIAS_DB {
     public function get_student_batch_ids($user_id) {
         global $wpdb;
         return $wpdb->get_col($wpdb->prepare(
-            "SELECT batch_id FROM ".CIAS_ENROLLMENTS." WHERE user_id=%d AND status='active'", $user_id
+            "SELECT batch_id FROM ".CIAS_ENROLLMENTS." WHERE user_id=%d AND (status='active' OR status IS NULL OR status='')", $user_id
         ));
     }
 
