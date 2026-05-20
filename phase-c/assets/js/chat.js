@@ -39,7 +39,8 @@ window.CIASChat = (function () {
   var _currentJob = null;
 
   /* ── Shared helpers (injected by init) ─────────────────────────────────── */
-  var _el, _esc, _nowTime, _setText, _restPost, _ajaxPost, _goTab;
+  // Note: _restPost and _ajaxPost removed — chat.js now uses CIAS_API directly
+  var _el, _esc, _nowTime, _setText, _goTab;
 
   /* ══════════════════════════════════════════════════════════════════════════
      INIT
@@ -51,8 +52,6 @@ window.CIASChat = (function () {
     _esc       = config.esc;
     _nowTime   = config.nowTime;
     _setText   = config.setText;
-    _restPost  = config.restPost;
-    _ajaxPost  = config.ajaxPost;
     _goTab     = config.goTab;
     _sessionId = config.sessionId || '';
 
@@ -205,7 +204,7 @@ window.CIASChat = (function () {
   ══════════════════════════════════════════════════════════════════════════ */
 
   function _processTextChat(txt, loadDiv) {
-    _restPost('/guru/chat', { message: txt, session_id: _sessionId }, function (res) {
+    CIAS_API.restPost('/guru/chat', { message: txt, session_id: _sessionId }, function (res) {
       if (res && res.job_id) {
         // ── Async path: job queued, poll for result ────────────────────────
         _removeLoadDiv(loadDiv);
@@ -263,7 +262,7 @@ window.CIASChat = (function () {
       var mime = _imgFile ? _imgFile.type : 'image/jpeg';
       var size = _imgFile ? _imgFile.size : 0;
 
-      _restPost('/upload/presign', { mime_type: mime, file_size: size, submission_type: 'answer_writing' },
+      CIAS_API.restPost('/upload/presign', { mime_type: mime, file_size: size, submission_type: 'answer_writing' },
         function (presignRes) {
           if (!presignRes || !presignRes.presign_url) {
             _fallbackImageChat(imageDataUrl, note, loadDiv, statusEl);
@@ -281,7 +280,7 @@ window.CIASChat = (function () {
           }).then(function (r) {
             if (!r.ok) throw new Error('R2 upload failed');
             statusEl.textContent = 'Running OCR...';
-            _restPost('/answer/submit', {
+            CIAS_API.restPost('/answer/submit', {
               object_key: presignRes.object_key,
               mime_type: mime, file_size: size,
               submission_type: 'answer_writing',
@@ -310,7 +309,7 @@ window.CIASChat = (function () {
 
   function _fallbackImageChat(imageDataUrl, note, loadDiv, statusEl) {
     if (statusEl) statusEl.textContent = 'Evaluating...';
-    _restPost('/guru/chat', {
+    CIAS_API.restPost('/guru/chat', {
       message: note || 'Please evaluate my handwritten answer.',
       session_id: _sessionId,
       image_object_key: '',
@@ -336,7 +335,7 @@ window.CIASChat = (function () {
     var maxAttempts = 30; // 60 seconds max
 
     function check() {
-      _ajaxPost('cias_job_poll', { job_id: jobId }, function (res) {
+      CIAS_API.ajaxPost('cias_job_poll', { job_id: jobId }, function (res) {
         attempts++;
         if (!res || !res.success) {
           if (attempts < maxAttempts) setTimeout(check, 2000);
@@ -358,7 +357,7 @@ window.CIASChat = (function () {
 
     function check() {
       attempts++;
-      _ajaxPost('cias_job_poll', { job_id: jobId }, function (res) {
+      CIAS_API.ajaxPost('cias_job_poll', { job_id: jobId }, function (res) {
         if (!res || !res.success) {
           if (attempts < 30) setTimeout(check, 2000);
           return;
@@ -425,7 +424,7 @@ window.CIASChat = (function () {
     if (btn && btn.previousElementSibling) {
       confirmedText = btn.previousElementSibling.textContent || '';
     }
-    _restPost('/answer/' + submissionId + '/confirm', {
+    CIAS_API.restPost('/answer/' + submissionId + '/confirm', {
       confirmed_text: confirmedText
     }, function () {
       appendBotMsg('Text confirmed! AI evaluation is starting. You\'ll see your score and feedback shortly.');
@@ -515,6 +514,7 @@ window.CIASChat = (function () {
     rmImg:      rmImg,
     onFile:     onFile,
     fillQ:      fillQ,
+    autoRes:    _autoRes,
     confirmOCR: confirmOCR,
     rejectOCR:  rejectOCR,
     pollJob:    pollJob,

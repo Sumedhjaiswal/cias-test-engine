@@ -105,20 +105,31 @@ class CIAS_Frontend {
             CIAS_PHASE_C_VERSION
         );
 
-        // chat.js — AI Guru module. Must load BEFORE cias-app.js
+        // core/api.js — centralized REST client. Must load FIRST.
+        // Provides: CIAS_API.restGet, restPost, ajaxPost
+        // Handles: safe JSON parsing, nonce separation, timeouts, auth failure
         wp_enqueue_script(
-            'cias-chat',
-            CIAS_PHASE_C_URL . 'assets/js/chat.js',
+            'cias-api',
+            CIAS_PHASE_C_URL . 'assets/js/core/api.js',
             [],
             CIAS_PHASE_C_VERSION,
             true
         );
 
-        // cias-app.js depends on CIASChat being defined by chat.js
+        // chat.js — AI Guru module. Depends on CIAS_API.
+        wp_enqueue_script(
+            'cias-chat',
+            CIAS_PHASE_C_URL . 'assets/js/chat.js',
+            [ 'cias-api' ],
+            CIAS_PHASE_C_VERSION,
+            true
+        );
+
+        // cias-app.js — main app. Depends on both CIAS_API and CIASChat.
         wp_enqueue_script(
             'cias-app',
             CIAS_PHASE_C_URL . 'assets/js/cias-app.js',
-            [ 'cias-chat' ],
+            [ 'cias-api', 'cias-chat' ],
             CIAS_PHASE_C_VERSION,
             true
         );

@@ -7,6 +7,33 @@
 var CIASApp = (function () {
   'use strict';
 
+  // ── Dependency guards ──────────────────────────────────────────────────
+  // If core/api.js or chat.js failed to load (404 on server),
+  // stubs ensure CIASApp always initialises and tabs always work.
+  if (typeof CIAS_API === 'undefined') {
+    console.error('[CIAS] core/api.js not loaded. Check core/ folder exists on server.');
+    window.CIAS_API = {
+      init: function(){},
+      restGet:  function(p,cb){ if(cb) cb({success:false,error:{code:'api_missing',message:'API module not loaded.'}}); },
+      restPost: function(p,b,cb){ if(cb) cb({success:false,error:{code:'api_missing',message:'API module not loaded.'}}); },
+      ajaxPost: function(a,d,cb){ if(cb) cb({success:false}); },
+      logError: function(m,msg){ console.error('[CIAS:'+m+']', msg); },
+      handleAuthFailure: function(){},
+    };
+  }
+  if (typeof CIASChat === 'undefined') {
+    console.error('[CIAS] chat.js not loaded. Guru chat unavailable.');
+    window.CIASChat = {
+      init:function(){}, sendMsg:function(){}, trigImg:function(){},
+      rmImg:function(){}, onFile:function(){}, fillQ:function(){},
+      autoRes:function(t){ if(t){t.style.height='auto';t.style.height=Math.min(t.scrollHeight,80)+'px';} },
+      confirmOCR:function(){}, rejectOCR:function(){},
+      pollJob:function(id,cb){ if(cb) cb(null); },
+      pollJobLive:function(){}, appendBotMsg:function(){},
+    };
+  }
+
+
   /* ── State ──────────────────────────────────────────────── */
   var D = window.ciasApp || {};
   var currentTab   = 'home';
@@ -21,47 +48,30 @@ var CIASApp = (function () {
   var sessionId    = '';
 
   /* ── REST / AJAX helpers ─────────────────────────────────── */
-  function restUrl(path) {
-    return (D.rest_url || '/wp-json/cias/v1') + path;
-  }
-
-  function ajaxUrl() {
-    return D.ajax_url || '/wp-admin/admin-ajax.php';
-  }
-
-  function restGet(path, cb) {
-    fetch(restUrl(path), {
-      headers: { 'X-WP-Nonce': D.nonce }
-    }).then(function (r) { return r.json(); }).then(cb).catch(function (e) {
-      console.error('CIAS REST GET', path, e);
-    });
-  }
-
-  function restPost(path, body, cb) {
-    fetch(restUrl(path), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': D.nonce },
-      body: JSON.stringify(body)
-    }).then(function (r) { return r.json(); }).then(cb).catch(function (e) {
-      console.error('CIAS REST POST', path, e);
-      if (cb) cb({ success: false, error: e.message });
-    });
-  }
-
-  function ajaxPost(action, data, cb) {
-    var fd = new FormData();
-    fd.append('action', action);
-    fd.append('nonce', D.nonce);
-    Object.keys(data).forEach(function (k) { fd.append(k, data[k]); });
-    fetch(ajaxUrl(), { method: 'POST', body: fd })
-      .then(function (r) { return r.json(); }).then(cb)
-      .catch(function (e) { console.error('CIAS AJAX', action, e); });
-  }
+  /* ── API — delegates to CIAS_API module (core/api.js) ──────── */
+  // All REST/AJAX transport, nonce handling, timeouts,
+  // auth failure detection, and logging live in core/api.js
+  function restGet(path, cb)        { CIAS_API.restGet(path, cb); }
+  function restPost(path, body, cb) { CIAS_API.restPost(path, body, cb); }
+  function ajaxPost(action, data, cb){ CIAS_API.ajaxPost(action, data, cb); }
 
   /* ── Boot ─────────────────────────────────────────────────── */
   function boot() {
     if (!D.user) return;
     sessionId = 'ses_' + D.user.id + '_' + Date.now().toString(36);
+
+    // ── Init API + Chat modules FIRST (before any render calls) ────────────
+    CIAS_API.init(D);
+
+    CIASChat.init({
+      data:      D,
+      el:        el,
+      esc:       esc,
+      nowTime:   nowTime,
+      setText:   setText,
+      goTab:     goTab,
+      sessionId: sessionId,
+    });
 
     populateTopbar();
     populateHome();
@@ -75,19 +85,6 @@ var CIASApp = (function () {
     renderInitialChat();
 
     goTab('home');
-
-    // ── Init Chat module (chat.js) ────────────────────────────────────────
-    CIASChat.init({
-      data:      D,
-      el:        el,
-      esc:       esc,
-      nowTime:   nowTime,
-      setText:   setText,
-      restPost:  restPost,
-      ajaxPost:  ajaxPost,
-      goTab:     goTab,
-      sessionId: sessionId,
-    });
   }
 
   /* ── Topbar ───────────────────────────────────────────────── */
@@ -875,6 +872,7 @@ var CIASApp = (function () {
   function rejectOCR(id)       { CIASChat.rejectOCR(id); }
   function pollJob(jid, cb)    { return CIASChat.pollJob(jid, cb); }
   function appendBotMsg(html)  { CIASChat.appendBotMsg(html); }
+  function autoRes(textarea)   { CIASChat.autoRes(textarea); }
 
   
   /* ── Progress ─────────────────────────────────────────────── */
@@ -1103,38 +1101,6 @@ var CIASApp = (function () {
     });
 
     if (t === 'vocab') { show('vocab-landing'); hide('vocab-session'); }
-  }
-
-  /* ── Chat helpers ────────────────────────────────────────── */
-  function appendBotMsg(html) {
-    var area = el('chat-area');
-    if (!area) return;
-    var div = document.createElement('div');
-    div.className = 'ca-msg-row';
-    div.innerHTML = '<div class="ca-bot-av"><i class="ti ti-brain" aria-hidden="true"></i></div>' +
-      '<div><div class="ca-msg-bubble"><p>' + html + '</p></div>' +
-      '<span class="ca-msg-time">CIAS AI · ' + nowTime() + '</span></div>';
-    area.appendChild(div);
-    area.scrollTop = area.scrollHeight;
-  }
-
-  function appendTypingIndicator() {
-    var area = el('chat-area');
-    if (!area) return document.createElement('div');
-    var div = document.createElement('div');
-    div.className = 'ca-msg-row';
-    div.innerHTML = '<div class="ca-bot-av"><i class="ti ti-brain" aria-hidden="true"></i></div>' +
-      '<div><div class="ca-msg-bubble"><div class="ca-typing"><span></span><span></span><span></span></div></div></div>';
-    area.appendChild(div);
-    area.scrollTop = area.scrollHeight;
-    return div;
-  }
-
-  function appendToChat(div) {
-    var area = el('chat-area');
-    if (!area) return;
-    area.appendChild(div);
-    area.scrollTop = area.scrollHeight;
   }
 
   /* ── DOM utilities ───────────────────────────────────────── */
