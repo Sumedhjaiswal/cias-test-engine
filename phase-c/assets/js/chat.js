@@ -514,6 +514,7 @@ window.CIASChat = (function () {
     rmImg:      rmImg,
     onFile:     onFile,
     fillQ:      fillQ,
+    autoRes:    _autoRes,
     confirmOCR: confirmOCR,
     rejectOCR:  rejectOCR,
     pollJob:    pollJob,

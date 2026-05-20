@@ -846,6 +846,7 @@ var CIASApp = (function () {
   function rejectOCR(id)       { CIASChat.rejectOCR(id); }
   function pollJob(jid, cb)    { return CIASChat.pollJob(jid, cb); }
   function appendBotMsg(html)  { CIASChat.appendBotMsg(html); }
+  function autoRes(textarea)   { CIASChat.autoRes(textarea); }
 
   
   /* ── Progress ─────────────────────────────────────────────── */
