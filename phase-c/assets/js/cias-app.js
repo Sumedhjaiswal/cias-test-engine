@@ -21,42 +21,12 @@ var CIASApp = (function () {
   var sessionId    = '';
 
   /* ── REST / AJAX helpers ─────────────────────────────────── */
-  function restUrl(path) {
-    return (D.rest_url || '/wp-json/cias/v1') + path;
-  }
-
-  function ajaxUrl() {
-    return D.ajax_url || '/wp-admin/admin-ajax.php';
-  }
-
-  function restGet(path, cb) {
-    fetch(restUrl(path), {
-      headers: { 'X-WP-Nonce': D.nonce }
-    }).then(function (r) { return r.json(); }).then(cb).catch(function (e) {
-      console.error('CIAS REST GET', path, e);
-    });
-  }
-
-  function restPost(path, body, cb) {
-    fetch(restUrl(path), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': D.nonce },
-      body: JSON.stringify(body)
-    }).then(function (r) { return r.json(); }).then(cb).catch(function (e) {
-      console.error('CIAS REST POST', path, e);
-      if (cb) cb({ success: false, error: e.message });
-    });
-  }
-
-  function ajaxPost(action, data, cb) {
-    var fd = new FormData();
-    fd.append('action', action);
-    fd.append('nonce', D.nonce);
-    Object.keys(data).forEach(function (k) { fd.append(k, data[k]); });
-    fetch(ajaxUrl(), { method: 'POST', body: fd })
-      .then(function (r) { return r.json(); }).then(cb)
-      .catch(function (e) { console.error('CIAS AJAX', action, e); });
-  }
+  /* ── API — delegates to CIAS_API module (core/api.js) ──────── */
+  // All REST/AJAX transport, nonce handling, timeouts,
+  // auth failure detection, and logging live in core/api.js
+  function restGet(path, cb)        { CIAS_API.restGet(path, cb); }
+  function restPost(path, body, cb) { CIAS_API.restPost(path, body, cb); }
+  function ajaxPost(action, data, cb){ CIAS_API.ajaxPost(action, data, cb); }
 
   /* ── Boot ─────────────────────────────────────────────────── */
   function boot() {
@@ -76,6 +46,9 @@ var CIASApp = (function () {
 
     goTab('home');
 
+    // ── Init API module (core/api.js) ────────────────────────────────────
+    CIAS_API.init(D);
+
     // ── Init Chat module (chat.js) ────────────────────────────────────────
     CIASChat.init({
       data:      D,
@@ -83,8 +56,6 @@ var CIASApp = (function () {
       esc:       esc,
       nowTime:   nowTime,
       setText:   setText,
-      restPost:  restPost,
-      ajaxPost:  ajaxPost,
       goTab:     goTab,
       sessionId: sessionId,
     });
