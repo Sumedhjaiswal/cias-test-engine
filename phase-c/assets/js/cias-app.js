@@ -7,6 +7,33 @@
 var CIASApp = (function () {
   'use strict';
 
+  // ── Dependency guards ──────────────────────────────────────────────────
+  // If core/api.js or chat.js failed to load (404 on server),
+  // stubs ensure CIASApp always initialises and tabs always work.
+  if (typeof CIAS_API === 'undefined') {
+    console.error('[CIAS] core/api.js not loaded. Check core/ folder exists on server.');
+    window.CIAS_API = {
+      init: function(){},
+      restGet:  function(p,cb){ if(cb) cb({success:false,error:{code:'api_missing',message:'API module not loaded.'}}); },
+      restPost: function(p,b,cb){ if(cb) cb({success:false,error:{code:'api_missing',message:'API module not loaded.'}}); },
+      ajaxPost: function(a,d,cb){ if(cb) cb({success:false}); },
+      logError: function(m,msg){ console.error('[CIAS:'+m+']', msg); },
+      handleAuthFailure: function(){},
+    };
+  }
+  if (typeof CIASChat === 'undefined') {
+    console.error('[CIAS] chat.js not loaded. Guru chat unavailable.');
+    window.CIASChat = {
+      init:function(){}, sendMsg:function(){}, trigImg:function(){},
+      rmImg:function(){}, onFile:function(){}, fillQ:function(){},
+      autoRes:function(t){ if(t){t.style.height='auto';t.style.height=Math.min(t.scrollHeight,80)+'px';} },
+      confirmOCR:function(){}, rejectOCR:function(){},
+      pollJob:function(id,cb){ if(cb) cb(null); },
+      pollJobLive:function(){}, appendBotMsg:function(){},
+    };
+  }
+
+
   /* ── State ──────────────────────────────────────────────── */
   var D = window.ciasApp || {};
   var currentTab   = 'home';
