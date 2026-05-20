@@ -22,7 +22,10 @@ class CIAS_Ajax {
     }
 
     private function check($nonce_key = 'cias_nonce') {
-        if (!check_ajax_referer($nonce_key, 'nonce', false) || !is_user_logged_in())
+        // Accept cias_nonce (old portal) and cias_app_nonce (new CIAS app)
+        $valid = check_ajax_referer($nonce_key, 'nonce', false)
+              || check_ajax_referer('cias_app_nonce', 'nonce', false);
+        if (!$valid || !is_user_logged_in())
             wp_send_json_error(['message' => 'Authentication failed.']);
     }
 
