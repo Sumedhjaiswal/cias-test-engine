@@ -75,7 +75,19 @@ var CIASApp = (function () {
     renderInitialChat();
 
     goTab('home');
-    bindChatInput();
+
+    // ── Init Chat module (chat.js) ────────────────────────────────────────
+    CIASChat.init({
+      data:      D,
+      el:        el,
+      esc:       esc,
+      nowTime:   nowTime,
+      setText:   setText,
+      restPost:  restPost,
+      ajaxPost:  ajaxPost,
+      goTab:     goTab,
+      sessionId: sessionId,
+    });
   }
 
   /* ── Topbar ───────────────────────────────────────────────── */
@@ -852,282 +864,19 @@ var CIASApp = (function () {
     });
   }
 
-  function fillQ(q) {
-    var inp = el('chat-inp');
-    if (inp) { inp.value = q; autoRes(inp); inp.focus(); }
-  }
 
-  function autoRes(textarea) {
-    textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 80) + 'px';
-  }
+  /* ── Chat — delegates to CIASChat module (chat.js) ─────────────── */
+  function fillQ(q)            { CIASChat.fillQ(q); }
+  function trigImg()           { CIASChat.trigImg(); }
+  function rmImg()             { CIASChat.rmImg(); }
+  function onFile(e)           { CIASChat.onFile(e); }
+  function sendMsg()           { CIASChat.sendMsg(); }
+  function confirmOCR(id, btn) { CIASChat.confirmOCR(id, btn); }
+  function rejectOCR(id)       { CIASChat.rejectOCR(id); }
+  function pollJob(jid, cb)    { return CIASChat.pollJob(jid, cb); }
+  function appendBotMsg(html)  { CIASChat.appendBotMsg(html); }
 
-  function trigImg() { el('file-inp').click(); }
-
-  function onFile(e) {
-    var file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { alert('Max file size is 10MB.'); return; }
-    imgFile = file;
-    var reader = new FileReader();
-    reader.onload = function (ev) {
-      imgData = ev.target.result;
-      el('img-thumb').src = imgData;
-      setText('img-lbl', file.name + ' (' + Math.round(file.size / 1024) + 'KB)');
-      addClass('img-strip', 'show');
-      el('chat-inp').placeholder = 'Add a note about this answer (optional)...';
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  }
-
-  function rmImg() {
-    imgData = null; imgFile = null;
-    el('img-thumb').src = '';
-    removeClass('img-strip', 'show');
-    el('chat-inp').placeholder = 'Ask your UPSC doubt...';
-  }
-
-  function bindChatInput() {
-    var inp = el('chat-inp');
-    if (!inp) return;
-    inp.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
-    });
-  }
-
-  function sendMsg() {
-    var inp   = el('chat-inp');
-    var txt   = inp ? inp.value.trim() : '';
-    var hasImg= !!imgData;
-
-    if (!txt && !hasImg) return;
-
-    if (D.credits.remaining <= 0 && D.credits.access_type !== 'free') {
-      appendBotMsg('You have no credits remaining. Please <a href="#" onclick="CIASApp.goTab(\'profile\')">buy more credits</a> to continue.');
-      return;
-    }
-    if (D.credits.remaining <= 0 && D.credits.access_type === 'free') {
-      var limitEl = document.createElement('div');
-      limitEl.innerHTML = '<div style="font-size:11px;color:#9ca3af;text-align:center;padding:4px 12px">Daily free limit reached · <a href="#" onclick="CIASApp.goTab(\'profile\')" style="color:#6c63ff;text-decoration:none">Upgrade →</a></div>';
-      if (el('chat-area')) el('chat-area').appendChild(limitEl);
-    }
-
-    // Display user message immediately
-    var userDiv = document.createElement('div');
-    userDiv.className = 'ca-msg-row ca-msg-user-row';
-    var bub = '<div class="ca-msg-user-bbl">';
-    if (hasImg) bub += '<img src="' + imgData + '" alt="Uploaded answer" class="ca-img-in-chat">';
-    bub += '<p>' + esc(txt || 'Answer image submitted for evaluation') + '</p></div>';
-    bub += '<span class="ca-msg-time" style="text-align:right">You · ' + nowTime() + '</span>';
-    userDiv.innerHTML = bub;
-    appendToChat(userDiv);
-
-    var savedTxt = txt; var savedHasImg = hasImg;
-    inp.value = ''; inp.style.height = 'auto';
-    var capturedImgData = imgData;
-    rmImg();
-
-    // Deduct credit locally
-    D.credits.remaining--;
-    setText('hdr-cr-num', D.credits.remaining);
-    setText('prof-cr', D.credits.remaining);
-    var usedPct = Math.round((D.credits.used / D.credits.monthly) * 100);
-    var remPct  = Math.round((D.credits.remaining / D.credits.monthly) * 100);
-    var barEl = el('cbar-fill');
-    if (barEl) barEl.style.width = (100 - remPct) + '%';
-
-    // Show typing indicator
-    var loadDiv = appendTypingIndicator();
-    var area = el('chat-area');
-
-    if (savedHasImg) {
-      // FLOW: image → Phase B REST presign → upload → submit → poll
-      processImageSubmission(capturedImgData, savedTxt, loadDiv);
-    } else {
-      // FLOW: text → Phase B REST guru/chat → poll
-      processTextChat(savedTxt, loadDiv);
-    }
-  }
-
-  function processTextChat(txt, loadDiv) {
-    restPost('/guru/chat', {
-      message: txt, session_id: sessionId
-    }, function (res) {
-      if (res && res.job_id) {
-        // Async path: job queued, poll for result
-        if (el('chat-area') && loadDiv.parentNode) el('chat-area').removeChild(loadDiv);
-        currentJobId = res.job_id;
-        pollJob(res.job_id, function (result) {
-          if (result && result.response) {
-            appendBotMsg(esc(result.response));
-          } else {
-            // Job failed — fall through to direct AJAX
-            guruDirectFallback(txt, loadDiv);
-          }
-        });
-      } else {
-        // REST failed (no job_id) — use direct synchronous AJAX fallback
-        guruDirectFallback(txt, loadDiv);
-      }
-    });
-  }
-
-  function guruDirectFallback(txt, loadDiv) {
-    // Direct call to Claude via AJAX — works even when cron/workers are down
-    ajaxPost('cias_guru_direct', { message: txt, session_id: sessionId }, function (res) {
-      if (el('chat-area') && loadDiv && loadDiv.parentNode) el('chat-area').removeChild(loadDiv);
-      if (res && res.success && res.data && res.data.response) {
-        appendBotMsg(esc(res.data.response));
-      } else {
-        var errMsg = (res && res.data && res.data.message) ? res.data.message : 'Something went wrong. Please try again.';
-        appendBotMsg(errMsg);
-      }
-    });
-  }
-
-  function processImageSubmission(imageDataUrl, note, loadDiv) {
-    var statusEl = document.createElement('span');
-    statusEl.className = 'ca-ocr-pill';
-    statusEl.textContent = 'Uploading...';
-    if (loadDiv.querySelector('.ca-typing')) {
-      loadDiv.querySelector('.ca-typing').after(statusEl);
-    }
-
-    // Step 1: Try Phase B presign → R2 upload path
-    if (D.r2_configured) {
-      var mime = imgFile ? imgFile.type : 'image/jpeg';
-      var size = imgFile ? imgFile.size : 0;
-      restPost('/upload/presign', { mime_type: mime, file_size: size, submission_type: 'answer_writing' },
-        function (presignRes) {
-          if (!presignRes || !presignRes.presign_url) {
-            fallbackImageChat(imageDataUrl, note, loadDiv, statusEl);
-            return;
-          }
-          statusEl.textContent = 'Uploading to R2...';
-          // Upload binary directly to R2
-          var binary = atob(imageDataUrl.split(',')[1]);
-          var arr = new Uint8Array(binary.length);
-          for (var i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
-          var blob = new Blob([arr], { type: mime });
-
-          fetch(presignRes.presign_url, {
-            method: 'PUT', body: blob,
-            headers: { 'Content-Type': mime }
-          }).then(function (r) {
-            if (!r.ok) throw new Error('R2 upload failed');
-            statusEl.textContent = 'Running OCR...';
-            // Step 2: Submit metadata
-            restPost('/answer/submit', {
-              object_key: presignRes.object_key,
-              mime_type: mime, file_size: size,
-              submission_type: 'answer_writing',
-              session_id: sessionId
-            }, function (submitRes) {
-              if (!submitRes || !submitRes.job_id) {
-                fallbackImageChat(imageDataUrl, note, loadDiv, statusEl);
-                return;
-              }
-              el('chat-area').removeChild(loadDiv);
-              appendBotMsg('Answer uploaded! OCR is running — I\'ll show you the extracted text shortly.<br><span class="ca-ocr-pill" id="ocr-live-status">Processing...</span>');
-              pollJobLive(submitRes.job_id, statusEl, note);
-            });
-          }).catch(function () {
-            fallbackImageChat(imageDataUrl, note, loadDiv, statusEl);
-          });
-        }
-      );
-    } else {
-      // No R2 — fall back to base64 chat
-      fallbackImageChat(imageDataUrl, note, loadDiv, statusEl);
-    }
-  }
-
-  function fallbackImageChat(imageDataUrl, note, loadDiv, statusEl) {
-    if (statusEl) statusEl.textContent = 'Evaluating...';
-    restPost('/guru/chat', {
-      message: note || 'Please evaluate my handwritten answer.',
-      session_id: sessionId,
-      image_object_key: '',
-      image_mime: 'image/jpeg'
-    }, function (res) {
-      if (el('chat-area') && loadDiv.parentNode) el('chat-area').removeChild(loadDiv);
-      if (res && res.job_id) {
-        pollJob(res.job_id, function (result) {
-          appendBotMsg(result && result.response ? esc(result.response) : 'Evaluation complete. Please check the results.');
-        });
-      } else {
-        appendBotMsg('Answer received. OCR and evaluation in progress. Please check your submissions in the Progress tab.');
-      }
-    });
-  }
-
-  function pollJob(jobId, cb) {
-    var attempts = 0;
-    var maxAttempts = 30; // 60 seconds
-    function check() {
-      ajaxPost('cias_job_poll', { job_id: jobId }, function (res) {
-        attempts++;
-        if (!res || !res.success) { if (attempts < maxAttempts) { setTimeout(check, 2000); } else { cb(null); } return; }
-        var d = res.data;
-        if (d.status === 'done') { cb(d.result); return; }
-        if (d.status === 'dead' || d.status === 'failed') { cb(null); return; }
-        if (attempts < maxAttempts) setTimeout(check, 2000);
-        else cb(null);
-      });
-    }
-    setTimeout(check, 1500);
-  }
-
-  function pollJobLive(jobId, statusEl, note) {
-    var attempts = 0;
-    function check() {
-      attempts++;
-      ajaxPost('cias_job_poll', { job_id: jobId }, function (res) {
-        if (!res || !res.success) { if (attempts < 30) setTimeout(check, 2000); return; }
-        var d = res.data;
-        if (d.status === 'done' && d.result) {
-          var r = d.result;
-          if (statusEl) statusEl.textContent = 'Done';
-          var liveEl = el('ocr-live-status');
-
-          if (r.needs_confirmation) {
-            // Medium confidence → ask student to confirm
-            var confirmHtml = '<strong>I extracted the following text (' + Math.round(r.confidence * 100) + '% confidence):</strong><br>' +
-              '<div style="background:#f8f8ff;border:0.5px solid #e9e9fb;border-radius:8px;padding:10px;margin:8px 0;font-size:12px;font-family:monospace">' + esc(r.raw_text) + '</div>' +
-              'Does this look correct? <br>' +
-              '<button onclick="CIASApp.confirmOCR(' + r.submission_id + ', this)" style="background:#6c63ff;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;margin-top:6px;margin-right:6px">Yes, evaluate this</button>' +
-              '<button onclick="CIASApp.rejectOCR(' + r.submission_id + ')" style="background:#f3f4f6;color:#374151;border:none;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;margin-top:6px">No, send to teacher</button>';
-            appendBotMsg(confirmHtml);
-          } else if (r.teacher_review) {
-            appendBotMsg('Your handwriting was difficult to read. I\'ve sent this answer to your teacher for review. You\'ll be notified when feedback is ready.');
-          } else if (r.auto_evaluating) {
-            appendBotMsg('Text extracted successfully! AI evaluation in progress...');
-          }
-          if (liveEl) liveEl.remove();
-        } else if (d.status === 'dead') {
-          appendBotMsg('There was an error processing your answer. Please try again.');
-        } else {
-          if (attempts < 30) setTimeout(check, 2000);
-        }
-      });
-    }
-    setTimeout(check, 2000);
-  }
-
-  function confirmOCR(submissionId, btn) {
-    if (btn) btn.disabled = true;
-    restPost('/answer/' + submissionId + '/confirm', {
-      confirmed_text: btn ? btn.previousElementSibling ? btn.previousElementSibling.textContent : '' : ''
-    }, function (res) {
-      appendBotMsg('Text confirmed! AI evaluation is starting. You\'ll see your score and feedback shortly.');
-    });
-  }
-
-  function rejectOCR(submissionId) {
-    appendBotMsg('Understood. Your answer has been sent to your teacher for manual review and scoring.');
-  }
-
+  
   /* ── Progress ─────────────────────────────────────────────── */
   function populateProgress() {
     setText('pg-tests',   D.stats.tests_taken);
@@ -1354,38 +1103,6 @@ var CIASApp = (function () {
     });
 
     if (t === 'vocab') { show('vocab-landing'); hide('vocab-session'); }
-  }
-
-  /* ── Chat helpers ────────────────────────────────────────── */
-  function appendBotMsg(html) {
-    var area = el('chat-area');
-    if (!area) return;
-    var div = document.createElement('div');
-    div.className = 'ca-msg-row';
-    div.innerHTML = '<div class="ca-bot-av"><i class="ti ti-brain" aria-hidden="true"></i></div>' +
-      '<div><div class="ca-msg-bubble"><p>' + html + '</p></div>' +
-      '<span class="ca-msg-time">CIAS AI · ' + nowTime() + '</span></div>';
-    area.appendChild(div);
-    area.scrollTop = area.scrollHeight;
-  }
-
-  function appendTypingIndicator() {
-    var area = el('chat-area');
-    if (!area) return document.createElement('div');
-    var div = document.createElement('div');
-    div.className = 'ca-msg-row';
-    div.innerHTML = '<div class="ca-bot-av"><i class="ti ti-brain" aria-hidden="true"></i></div>' +
-      '<div><div class="ca-msg-bubble"><div class="ca-typing"><span></span><span></span><span></span></div></div></div>';
-    area.appendChild(div);
-    area.scrollTop = area.scrollHeight;
-    return div;
-  }
-
-  function appendToChat(div) {
-    var area = el('chat-area');
-    if (!area) return;
-    area.appendChild(div);
-    area.scrollTop = area.scrollHeight;
   }
 
   /* ── DOM utilities ───────────────────────────────────────── */
