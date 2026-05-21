@@ -641,17 +641,19 @@ var CIASApp = (function () {
 
   // ── Question render ─────────────────────────────────────────
   function renderQuestion(idx) {
-    if (!examState || !examState.questions[idx]) return;
+    if (!examState || !examState.questions || !examState.questions[idx]) return;
     examState.current = idx;
     var q    = examState.questions[idx];
     var tot  = examState.questions.length;
     var saved= examState.saved;
+    var prog = el('exam-prog');
+    var qtext = el('exam-qtext');
 
     setText('exam-qnum', 'Q' + (idx + 1) + ' of ' + tot);
-    if (el('exam-prog')) el('exam-prog').style.width = Math.round((idx / tot) * 100) + '%';
+    if (prog) prog.style.width = Math.round((idx / tot) * 100) + '%';
 
     // Question text
-    if (el('exam-qtext')) el('exam-qtext').textContent = q.question_text || '';
+    if (qtext) qtext.textContent = q.question_text || '';
 
     // Statements (for statement-type questions)
     var stmtsEl = el('exam-statements');
