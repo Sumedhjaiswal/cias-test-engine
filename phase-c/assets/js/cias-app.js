@@ -608,6 +608,12 @@ var CIASApp = (function () {
         return;
       }
       var d = res.data;
+      // Validate questions array
+      if (!d.questions || !d.questions.length) {
+        alert('This test has no questions yet. Please ask your teacher to add questions.');
+        goTab('tests');
+        return;
+      }
       examState = {
         testId:      testId,
         attemptId:   d.attempt_id,
@@ -642,10 +648,10 @@ var CIASApp = (function () {
     var saved= examState.saved;
 
     setText('exam-qnum', 'Q' + (idx + 1) + ' of ' + tot);
-    el('exam-prog').style.width = Math.round((idx / tot) * 100) + '%';
+    if (el('exam-prog')) el('exam-prog').style.width = Math.round((idx / tot) * 100) + '%';
 
     // Question text
-    el('exam-qtext').textContent = q.question_text;
+    if (el('exam-qtext')) el('exam-qtext').textContent = q.question_text || '';
 
     // Statements (for statement-type questions)
     var stmtsEl = el('exam-statements');
