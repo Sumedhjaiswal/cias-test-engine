@@ -58,7 +58,7 @@ var CIASApp = (function () {
   /* ── Boot ─────────────────────────────────────────────────── */
   function boot() {
     if (!D.user) return;
-    console.log('[CIAS] app version 3.21.4 loaded');
+    console.log('[CIAS] app version 3.21.5 loaded');
     sessionId = 'ses_' + D.user.id + '_' + Date.now().toString(36);
 
     // ── Init API + Chat modules FIRST (before any render calls) ────────────
@@ -558,6 +558,9 @@ var CIASApp = (function () {
       } else if (t.status === 'upcoming') {
         badge = '<span class="ca-test-badge" style="background:#f3f4f6;color:#6b7280">⏰ Upcoming</span>';
         btn   = '<button class="ca-btn-start-test" disabled style="opacity:.5;cursor:not-allowed">Not yet available</button>';
+      } else if (t.status === 'expired') {
+        badge = '<span class="ca-test-badge" style="background:#fee2e2;color:#991b1b">⛔ Expired</span>';
+        btn   = '<button class="ca-btn-start-test" disabled style="opacity:.5;cursor:not-allowed">Test window closed</button>';
       } else if (t.status === 'in_progress') {
         badge = '<span class="ca-test-badge" style="background:#dbeafe;color:#1d4ed8">🔄 In Progress</span>';
         btn   = '<button class="ca-btn-start-test" onclick="CIASApp.startTest(' + t.id + ',' + (t.has_pin?'true':'false') + ')">Continue →</button>';
