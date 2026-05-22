@@ -19,7 +19,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'CIAS_PHASE_C_VERSION', '3.21.1' );
+define( 'CIAS_PHASE_C_VERSION', '3.21.2' );
 define( 'CIAS_PHASE_C_DIR',     __DIR__ . '/' );
 define( 'CIAS_PHASE_C_URL',     plugin_dir_url( CIAS_PLUGIN_FILE ) . 'phase-c/' );
 

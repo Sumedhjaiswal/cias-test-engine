@@ -58,7 +58,7 @@ var CIASApp = (function () {
   /* ── Boot ─────────────────────────────────────────────────── */
   function boot() {
     if (!D.user) return;
-    console.log('[CIAS] app version 3.21.1 loaded');
+    console.log('[CIAS] app version 3.21.2 loaded');
     sessionId = 'ses_' + D.user.id + '_' + Date.now().toString(36);
 
     // ── Init API + Chat modules FIRST (before any render calls) ────────────
@@ -599,8 +599,11 @@ var CIASApp = (function () {
     var overlay = el('exam-submit-overlay');
     if (overlay) overlay.style.display = 'none';
     goTab('exam');
-    var body = el('exam-body');
-    if (body) body.innerHTML = '<div style="text-align:center;padding:30px"><div class="ca-typing"><span></span><span></span><span></span></div><p style="color:#9ca3af;font-size:13px;margin-top:10px">Loading questions...</p></div>';
+    // Show loading in qtext ONLY — never overwrite exam-body
+    // (exam-body contains exam-qtext/exam-statements/exam-opts which
+    //  renderQuestion needs; overwriting it destroys those elements)
+    var qtextEl = el('exam-qtext');
+    if (qtextEl) qtextEl.innerHTML = '<div style="text-align:center;padding:20px"><div class="ca-typing"><span></span><span></span><span></span></div><p style="color:#9ca3af;font-size:13px;margin-top:10px">Loading questions...</p></div>';
 
     ajaxPost('cias_start_test', { test_id: testId }, function(res) {
       if (!res || !res.success) {
