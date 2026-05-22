@@ -58,7 +58,7 @@ var CIASApp = (function () {
   /* ── Boot ─────────────────────────────────────────────────── */
   function boot() {
     if (!D.user) return;
-    console.log('[CIAS] app version 3.21.5 loaded');
+    console.log('[CIAS] app version 3.22.0 loaded');
     sessionId = 'ses_' + D.user.id + '_' + Date.now().toString(36);
 
     // ── Init API + Chat modules FIRST (before any render calls) ────────────
@@ -615,35 +615,41 @@ var CIASApp = (function () {
         return;
       }
       var d = res.data;
-      // Validate questions array
-      if (!d.questions || !d.questions.length) {
-        alert('This test has no questions yet. Please ask your teacher to add questions.');
-        goTab('tests');
-        return;
-      }
-      examState = {
-        testId:      testId,
-        attemptId:   d.attempt_id,
-        title:       d.test_title,
-        questions:   d.questions,
-        saved:       d.saved || {},
-        current:     0,
-        timeLeft:    d.time_limit > 0 ? d.time_limit * 60 : null,
-        timeLimitMin:d.time_limit,
-        passmark:    d.pass_mark || 60,
-      };
-      if (el('exam-title')) {
-        setText('exam-title', d.test_title);
-        buildQNav();
-        renderQuestion(0);
-        startExamTimer();
-      } else {
-        // Exam screen not found — redirect to portal page
-        CIAS_API.logError('beginExam', 'Exam screen elements not found in DOM', 'error');
-        alert('Please use the app at vocabulary-practice page to take tests.');
-        goTab('tests');
-      }
+      renderExamFromData(d, testId, 'tests');
     });
+  }
+
+  // Shared exam renderer — used by both regular tests and adaptive practice
+  function renderExamFromData(d, testId, returnTab) {
+    returnTab = returnTab || 'tests';
+    if (!d.questions || !d.questions.length) {
+      alert('No questions available for this. Please try a different topic or ask your teacher to add questions.');
+      goTab(returnTab);
+      return;
+    }
+    examState = {
+      testId:      testId || d.test_id || 0,
+      attemptId:   d.attempt_id,
+      title:       d.test_title,
+      questions:   d.questions,
+      saved:       d.saved || {},
+      current:     0,
+      timeLeft:    d.time_limit > 0 ? d.time_limit * 60 : null,
+      timeLimitMin:d.time_limit,
+      passmark:    d.pass_mark || 60,
+      isAdaptive:  !!d.adaptive,
+      returnTab:   returnTab,
+    };
+    if (el('exam-title')) {
+      setText('exam-title', d.test_title);
+      buildQNav();
+      renderQuestion(0);
+      startExamTimer();
+    } else {
+      CIAS_API.logError('renderExamFromData', 'Exam screen elements not found in DOM', 'error');
+      alert('Could not open the exam screen. Please reload the page.');
+      goTab(returnTab);
+    }
   }
 
   // ── Question render ─────────────────────────────────────────
@@ -857,6 +863,59 @@ var CIASApp = (function () {
       } else {
         if (wrap) wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af">Results not available.</div>';
       }
+    });
+  }
+
+  /* ── Practice (adaptive) ─────────────────────────────────── */
+  function loadPractice() {
+    goTab('practice');
+    var wrap = el('practice-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = '<div style="text-align:center;padding:30px"><div class="ca-typing"><span></span><span></span><span></span></div><p style="color:#9ca3af;font-size:13px;margin-top:10px">Loading practice...</p></div>';
+    ajaxPost('cias_get_practice', {}, function(res) {
+      if (res && res.success && res.data && res.data.html) {
+        wrap.innerHTML = res.data.html;
+      } else {
+        wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af">Could not load practice. Please try again.</div>';
+      }
+    });
+  }
+
+  function loadPracticeSubject(subjectId) {
+    // Reload the practice panel filtered to a subject (updates topic performance)
+    var wrap = el('practice-wrap');
+    if (!wrap) return;
+    ajaxPost('cias_get_practice', { subject_id: subjectId }, function(res) {
+      if (res && res.success && res.data && res.data.html) {
+        wrap.innerHTML = res.data.html;
+      }
+    });
+  }
+
+  function startAdaptive(subjectId, topicId, subtopicId, type) {
+    if (!subjectId) { alert('Please select a subject.'); return; }
+    var countEl = el('prac-count');
+    var qCount  = countEl ? parseInt(countEl.value, 10) : 15;
+
+    var overlay = el('exam-submit-overlay');
+    if (overlay) overlay.style.display = 'none';
+    goTab('exam');
+    var qtextEl = el('exam-qtext');
+    if (qtextEl) qtextEl.innerHTML = '<div style="text-align:center;padding:20px"><div class="ca-typing"><span></span><span></span><span></span></div><p style="color:#9ca3af;font-size:13px;margin-top:10px">Building your practice set...</p></div>';
+
+    ajaxPost('cias_start_adaptive', {
+      subject_id:   subjectId,
+      topic_id:     topicId    || 0,
+      subtopic_id:  subtopicId || 0,
+      adaptive_type:type       || 'practice',
+      q_count:      qCount
+    }, function(res) {
+      if (!res || !res.success) {
+        alert((res && res.data && res.data.message) || 'Could not start practice. Please try again.');
+        goTab('practice');
+        return;
+      }
+      renderExamFromData(res.data, res.data.test_id || 0, 'practice');
     });
   }
 
@@ -1104,8 +1163,8 @@ var CIASApp = (function () {
   /* ── Tab navigation ──────────────────────────────────────── */
   function goTab(t) {
     currentTab = t;
-    // All screens — including new exam + results
-    var allScreens = ['home','tests','progress','profile','vocab','tutor','exam','results'];
+    // All screens — including new exam + results + practice
+    var allScreens = ['home','tests','progress','profile','vocab','tutor','exam','results','practice'];
     allScreens.forEach(function(s) {
       var sc = el('scr-' + s);
       if (!sc) return;
@@ -1171,6 +1230,9 @@ var CIASApp = (function () {
     closeConfirm:  closeConfirm,
     submitExam:    submitExam,
     reviewTest:    reviewTest,
+    loadPractice:  loadPractice,
+    loadPracticeSubject: loadPracticeSubject,
+    startAdaptive: startAdaptive,
     endSession:    endSession,
     flipCard:      flipCard,
     nextCard:      nextCard,

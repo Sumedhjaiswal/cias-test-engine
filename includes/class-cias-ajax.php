@@ -513,7 +513,7 @@ class CIAS_Ajax {
   <div class="cias-practice-select">
     <div class="cias-prac-field">
       <label>Subject</label>
-      <select id="prac-subject" onchange="CIASApp.loadPractice(this.value)">
+      <select id="prac-subject" onchange="CIASApp.loadPracticeSubject(this.value)">
         <?php foreach($subjects as $s): ?>
         <option value="<?php echo $s->id; ?>" <?php selected($subject_id,$s->id); ?>><?php echo esc_html($s->name); ?></option>
         <?php endforeach; ?>

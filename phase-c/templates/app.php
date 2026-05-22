@@ -53,7 +53,7 @@ defined( 'ABSPATH' ) || exit;
           <div class="ca-act-sub">Doubt? Ask your mentor</div>
         </button>
 
-        <button class="ca-act-card ca-act-green" onclick="CIASApp.goTab('tutor'); CIASApp.fillQ('Evaluate my handwritten answer')" aria-label="Practice">
+        <button class="ca-act-card ca-act-green" onclick="CIASApp.loadPractice()" aria-label="Practice">
           <div class="ca-act-top">
             <i class="ti ti-writing ca-act-icon" aria-hidden="true"></i>
             <span class="ca-act-pill ca-act-pill-green">NEW</span>
@@ -270,6 +270,26 @@ defined( 'ABSPATH' ) || exit;
     <!-- RESULTS SCREEN -->
     <section class="ca-screen" id="scr-results" aria-label="Test Results" style="display:none">
       <div class="ca-results-wrap" id="results-wrap"></div>
+    </section>
+
+    <!-- PRACTICE (adaptive) -->
+    <section class="ca-screen" id="scr-practice" aria-label="Practice" style="display:none">
+      <style>
+        #scr-practice{--ct-bg:#f5f5fb;--ct-card:#fff;--ct-text:#1a1560;--ct-border:#e9e9fb;--ct-muted:#9ca3af;--ct-red:#ef4444}
+        #scr-practice .cias-section-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ct-muted);padding:14px 14px 8px}
+        #scr-practice .cias-btn{border:none;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+        #scr-practice .cias-btn-primary{background:#6c63ff;color:#fff}
+        #scr-practice .cias-btn-sm{padding:6px 12px;font-size:12px;background:#f3f4f6;color:#374151}
+        #scr-practice .cias-test-card{background:var(--ct-card);border-radius:14px;padding:14px;margin:0 14px 10px;box-shadow:0 1px 4px rgba(0,0,0,.05);border-left:4px solid #6c63ff}
+        #scr-practice .cias-test-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+        #scr-practice .cias-subject-tag{font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px;border:1px solid}
+        #scr-practice .cias-result-badge{font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px}
+        #scr-practice .cias-test-title{font-size:15px;font-weight:700;color:var(--ct-text);margin:4px 0 8px}
+        #scr-practice .cias-test-meta{display:flex;gap:14px;font-size:12px;color:var(--ct-muted);margin-bottom:10px}
+        #scr-practice .cias-practice-wrap{padding-bottom:20px}
+      </style>
+      <div style="padding:14px 14px 0"><button onclick="CIASApp.goTab('home')" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#6c63ff;font-weight:600;font-size:13px;cursor:pointer">&#8592; Back to Home</button></div>
+      <div class="ca-practice-wrap" id="practice-wrap"></div>
     </section>
 
     <!-- AI GURU -->
