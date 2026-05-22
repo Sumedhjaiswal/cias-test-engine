@@ -58,7 +58,7 @@ var CIASApp = (function () {
   /* ── Boot ─────────────────────────────────────────────────── */
   function boot() {
     if (!D.user) return;
-    console.log('[CIAS] app version 3.22.0 loaded');
+    console.log('[CIAS] app version 3.23.0 loaded');
     sessionId = 'ses_' + D.user.id + '_' + Date.now().toString(36);
 
     // ── Init API + Chat modules FIRST (before any render calls) ────────────
@@ -882,13 +882,41 @@ var CIASApp = (function () {
   }
 
   function loadPracticeSubject(subjectId) {
-    // Reload the practice panel filtered to a subject (updates topic performance)
-    var wrap = el('practice-wrap');
-    if (!wrap) return;
-    ajaxPost('cias_get_practice', { subject_id: subjectId }, function(res) {
-      if (res && res.success && res.data && res.data.html) {
-        wrap.innerHTML = res.data.html;
-      }
+    // Cascading: populate the Topic dropdown for the chosen subject.
+    // Reset Topic + Subtopic to defaults first.
+    var topicEl = el('prac-topic');
+    var subEl   = el('prac-subtopic');
+    if (topicEl) topicEl.innerHTML = '<option value="0">All topics</option>';
+    if (subEl)   subEl.innerHTML   = '<option value="0">All subtopics</option>';
+    if (!subjectId || subjectId === '0') return;
+
+    ajaxPost('cias_practice_options', { subject_id: subjectId, topic_id: 0 }, function(res) {
+      if (!res || !res.success || !res.data || !topicEl) return;
+      var topics = res.data.topics || [];
+      topics.forEach(function(t) {
+        var opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name + (t.q ? ' (' + t.q + ')' : '');
+        topicEl.appendChild(opt);
+      });
+    });
+  }
+
+  function loadPracticeTopic(topicId) {
+    // Cascading: populate the Subtopic dropdown for the chosen topic.
+    var subEl = el('prac-subtopic');
+    if (subEl) subEl.innerHTML = '<option value="0">All subtopics</option>';
+    if (!topicId || topicId === '0') return;
+
+    ajaxPost('cias_practice_options', { subject_id: 0, topic_id: topicId }, function(res) {
+      if (!res || !res.success || !res.data || !subEl) return;
+      var subs = res.data.subtopics || [];
+      subs.forEach(function(st) {
+        var opt = document.createElement('option');
+        opt.value = st.id;
+        opt.textContent = st.name;
+        subEl.appendChild(opt);
+      });
     });
   }
 
@@ -1232,6 +1260,7 @@ var CIASApp = (function () {
     reviewTest:    reviewTest,
     loadPractice:  loadPractice,
     loadPracticeSubject: loadPracticeSubject,
+    loadPracticeTopic: loadPracticeTopic,
     startAdaptive: startAdaptive,
     endSession:    endSession,
     flipCard:      flipCard,

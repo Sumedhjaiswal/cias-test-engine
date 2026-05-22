@@ -8,6 +8,7 @@ class CIAS_Ajax {
             'cias_get_tests','cias_start_test','cias_save_answer',
             'cias_submit_test','cias_get_results','cias_get_history',
             'cias_get_practice','cias_start_adaptive','cias_get_due_revisions',
+            'cias_practice_options',
             'cias_get_leaderboard','cias_get_teacher_dashboard',
             'cias_get_student_detail','cias_get_offline_history',
             'cias_verify_pin','cias_session_heartbeat','cias_ai_overview',
@@ -514,9 +515,22 @@ class CIAS_Ajax {
     <div class="cias-prac-field">
       <label>Subject</label>
       <select id="prac-subject" onchange="CIASApp.loadPracticeSubject(this.value)">
+        <option value="0">Select subject…</option>
         <?php foreach($subjects as $s): ?>
         <option value="<?php echo $s->id; ?>" <?php selected($subject_id,$s->id); ?>><?php echo esc_html($s->name); ?></option>
         <?php endforeach; ?>
+      </select>
+    </div>
+    <div class="cias-prac-field">
+      <label>Topic</label>
+      <select id="prac-topic" onchange="CIASApp.loadPracticeTopic(this.value)">
+        <option value="0">All topics</option>
+      </select>
+    </div>
+    <div class="cias-prac-field">
+      <label>Subtopic</label>
+      <select id="prac-subtopic">
+        <option value="0">All subtopics</option>
       </select>
     </div>
     <div class="cias-prac-field">
@@ -528,7 +542,7 @@ class CIAS_Ajax {
         <option value="25">25 questions</option>
       </select>
     </div>
-    <button class="cias-btn cias-btn-primary" onclick="CIASApp.startAdaptive(parseInt(document.getElementById('prac-subject').value),0,0,'practice')">Start Practice →</button>
+    <button class="cias-btn cias-btn-primary" onclick="CIASApp.startAdaptive(parseInt(document.getElementById('prac-subject').value),parseInt(document.getElementById('prac-topic').value),parseInt(document.getElementById('prac-subtopic').value),'practice')">Start Practice →</button>
   </div>
 
   <?php if (!empty($stats)): ?>
@@ -572,6 +586,34 @@ class CIAS_Ajax {
 </style>
         <?php
         wp_send_json_success(['html'=>ob_get_clean()]);
+    }
+
+    /* ── Cascading topic/subtopic options for practice filters ── */
+    public function cias_practice_options() {
+        $this->check();
+        $db          = new CIAS_DB();
+        $subject_id  = intval($_POST['subject_id'] ?? 0);
+        $topic_id    = intval($_POST['topic_id'] ?? 0);
+
+        $topics    = [];
+        $subtopics = [];
+
+        if ($subject_id > 0) {
+            // Only topics in this subject that have published questions
+            $all_topics = $db->get_topics_with_subject();
+            foreach ($all_topics as $t) {
+                if (intval($t->subject_id) === $subject_id && intval($t->question_count) > 0) {
+                    $topics[] = ['id' => (int)$t->id, 'name' => $t->name, 'q' => (int)$t->question_count];
+                }
+            }
+        }
+        if ($topic_id > 0) {
+            $rows = $db->get_subtopics_by_topic($topic_id);
+            foreach ($rows as $st) {
+                $subtopics[] = ['id' => (int)$st->id, 'name' => $st->name];
+            }
+        }
+        wp_send_json_success(['topics' => $topics, 'subtopics' => $subtopics]);
     }
 
     /* ── Start adaptive/practice/drill/revision test ── */
