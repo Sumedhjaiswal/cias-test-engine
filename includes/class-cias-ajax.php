@@ -195,13 +195,18 @@ class CIAS_Ajax {
                 $is_upcoming  = $sched_ts > 0 && $sched_ts > $now_ts && !$is_done && !$in_progress;
                 $has_pin      = !empty($t->access_pin) && (!$t->pin_expires_at || strtotime($t->pin_expires_at) > time());
 
+                $end_ts = !empty($t->end_date) ? strtotime($t->end_date) : 0;
+                $is_expired = $end_ts > 0 && $end_ts < $now_ts && !$is_done && !$in_progress;
+
                 if ($is_done)         $status = 'completed';
                 elseif ($is_upcoming) $status = 'upcoming';
+                elseif ($is_expired)  $status = 'expired';
                 elseif ($in_progress) $status = 'in_progress';
                 else                  $status = 'available';
 
                 $structured[] = [
                     'id'           => (int)$t->id,
+                    'attempt_id'   => $is_done ? (int)$t->attempt_id : 0,
                     'title'        => $t->title,
                     'subject_name' => $t->subject_name ?? 'General',
                     'subject_color'=> $t->subject_color ?? '#6C63FF',
@@ -209,6 +214,7 @@ class CIAS_Ajax {
                     'q_count'      => (int)($t->q_count ?? 0),
                     'time_limit'   => (int)($t->time_limit ?? 0),
                     'scheduled_date'=> $t->scheduled_date ?? null,
+                    'end_date'     => $t->end_date ?? null,
                     'status'       => $status,
                     'score'        => $is_done ? round((float)($t->my_pct ?? 0), 1) : null,
                     'has_pin'      => $has_pin,
@@ -231,6 +237,21 @@ class CIAS_Ajax {
         $db   = new CIAS_DB();
         $test = $db->get_by_id('tests', $test_id);
         if (!$test || $test->status !== 'published') wp_send_json_error(['message' => 'Test not available.']);
+
+        // ── Schedule window enforcement ──────────────────────────────────
+        $now_ts = current_time('timestamp');
+        if (!empty($test->scheduled_date)) {
+            $start_ts = strtotime($test->scheduled_date);
+            if ($start_ts && $now_ts < $start_ts) {
+                wp_send_json_error(['message' => 'This test has not started yet. It opens at ' . date_i18n('M j, g:i A', $start_ts) . '.']);
+            }
+        }
+        if (!empty($test->end_date)) {
+            $end_ts = strtotime($test->end_date);
+            if ($end_ts && $now_ts > $end_ts) {
+                wp_send_json_error(['message' => 'This test has ended. The window closed at ' . date_i18n('M j, g:i A', $end_ts) . '.']);
+            }
+        }
 
         $existing_done = get_transient('cias_done_' . $uid . '_' . $test_id);
         if (!$existing_done) {

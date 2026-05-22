@@ -1039,6 +1039,11 @@ class CIAS_DB {
         $total    = intval($attempt->total);
         $pct      = $total > 0 ? round(($score/$total)*100,1) : 0;
         $time_taken = (int)(strtotime(current_time('mysql')) - strtotime($attempt->started_at));
+        // Cap time_taken at the test's time_limit (prevents inflated values
+        // when an in-progress attempt was left open across sessions)
+        $tl = intval($wpdb->get_var($wpdb->prepare("SELECT time_limit FROM ".CIAS_TESTS." WHERE id=%d",$attempt->test_id)));
+        if ($tl > 0 && $time_taken > $tl * 60) $time_taken = $tl * 60;
+        if ($time_taken < 0) $time_taken = 0;
 
         $wpdb->update(CIAS_ATTEMPTS,[
             'score'        => $score,

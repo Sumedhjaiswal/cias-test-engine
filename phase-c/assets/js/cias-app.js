@@ -58,6 +58,7 @@ var CIASApp = (function () {
   /* ── Boot ─────────────────────────────────────────────────── */
   function boot() {
     if (!D.user) return;
+    console.log('[CIAS] app version 3.21.5 loaded');
     sessionId = 'ses_' + D.user.id + '_' + Date.now().toString(36);
 
     // ── Init API + Chat modules FIRST (before any render calls) ────────────
@@ -553,10 +554,13 @@ var CIASApp = (function () {
         var pct = t.score !== null ? Math.round(t.score) : '--';
         var passed = t.score !== null && t.score >= (t.pass_mark || 60);
         badge = '<span class="ca-test-badge" style="background:' + (passed?'#dcfce7':'#fee2e2') + ';color:' + (passed?'#166534':'#991b1b') + '">' + pct + '% · ' + (passed?'Pass':'Fail') + '</span>';
-        btn   = '<button class="ca-btn-review-test" onclick="CIASApp.reviewTest(' + t.id + ')">Review Answers</button>';
+        btn   = '<button class="ca-btn-review-test" onclick="CIASApp.reviewTest(' + (t.attempt_id || 0) + ')">Review Answers</button>';
       } else if (t.status === 'upcoming') {
         badge = '<span class="ca-test-badge" style="background:#f3f4f6;color:#6b7280">⏰ Upcoming</span>';
         btn   = '<button class="ca-btn-start-test" disabled style="opacity:.5;cursor:not-allowed">Not yet available</button>';
+      } else if (t.status === 'expired') {
+        badge = '<span class="ca-test-badge" style="background:#fee2e2;color:#991b1b">⛔ Expired</span>';
+        btn   = '<button class="ca-btn-start-test" disabled style="opacity:.5;cursor:not-allowed">Test window closed</button>';
       } else if (t.status === 'in_progress') {
         badge = '<span class="ca-test-badge" style="background:#dbeafe;color:#1d4ed8">🔄 In Progress</span>';
         btn   = '<button class="ca-btn-start-test" onclick="CIASApp.startTest(' + t.id + ',' + (t.has_pin?'true':'false') + ')">Continue →</button>';
@@ -598,8 +602,11 @@ var CIASApp = (function () {
     var overlay = el('exam-submit-overlay');
     if (overlay) overlay.style.display = 'none';
     goTab('exam');
-    var body = el('exam-body');
-    if (body) body.innerHTML = '<div style="text-align:center;padding:30px"><div class="ca-typing"><span></span><span></span><span></span></div><p style="color:#9ca3af;font-size:13px;margin-top:10px">Loading questions...</p></div>';
+    // Show loading in qtext ONLY — never overwrite exam-body
+    // (exam-body contains exam-qtext/exam-statements/exam-opts which
+    //  renderQuestion needs; overwriting it destroys those elements)
+    var qtextEl = el('exam-qtext');
+    if (qtextEl) qtextEl.innerHTML = '<div style="text-align:center;padding:20px"><div class="ca-typing"><span></span><span></span><span></span></div><p style="color:#9ca3af;font-size:13px;margin-top:10px">Loading questions...</p></div>';
 
     ajaxPost('cias_start_test', { test_id: testId }, function(res) {
       if (!res || !res.success) {
@@ -608,6 +615,12 @@ var CIASApp = (function () {
         return;
       }
       var d = res.data;
+      // Validate questions array
+      if (!d.questions || !d.questions.length) {
+        alert('This test has no questions yet. Please ask your teacher to add questions.');
+        goTab('tests');
+        return;
+      }
       examState = {
         testId:      testId,
         attemptId:   d.attempt_id,
@@ -619,44 +632,56 @@ var CIASApp = (function () {
         timeLimitMin:d.time_limit,
         passmark:    d.pass_mark || 60,
       };
-      setText('exam-title', d.test_title);
-      buildQNav();
-      renderQuestion(0);
-      startExamTimer();
+      if (el('exam-title')) {
+        setText('exam-title', d.test_title);
+        buildQNav();
+        renderQuestion(0);
+        startExamTimer();
+      } else {
+        // Exam screen not found — redirect to portal page
+        CIAS_API.logError('beginExam', 'Exam screen elements not found in DOM', 'error');
+        alert('Please use the app at vocabulary-practice page to take tests.');
+        goTab('tests');
+      }
     });
   }
 
   // ── Question render ─────────────────────────────────────────
   function renderQuestion(idx) {
-    if (!examState || !examState.questions[idx]) return;
+    if (!examState || !examState.questions || !examState.questions[idx]) return;
     examState.current = idx;
     var q    = examState.questions[idx];
     var tot  = examState.questions.length;
     var saved= examState.saved;
+    var prog = el('exam-prog');
+    var qtext = el('exam-qtext');
 
     setText('exam-qnum', 'Q' + (idx + 1) + ' of ' + tot);
-    el('exam-prog').style.width = Math.round((idx / tot) * 100) + '%';
+    if (prog) prog.style.width = Math.round((idx / tot) * 100) + '%';
 
     // Question text
-    el('exam-qtext').textContent = q.question_text;
+    if (qtext) qtext.textContent = q.question_text || '';
 
     // Statements (for statement-type questions)
     var stmtsEl = el('exam-statements');
     var stmts = q.statements ? JSON.parse(q.statements) : [];
-    if (stmts && stmts.length) {
-      stmtsEl.style.display = 'block';
-      stmtsEl.innerHTML = stmts.map(function(s, i) {
-        return '<div class="ca-exam-stmt"><span class="ca-exam-stmt-num">' + (i+1) + '</span><span>' + esc(s) + '</span></div>';
-      }).join('');
-    } else {
-      stmtsEl.style.display = 'none';
+    if (stmtsEl) {
+      if (stmts && stmts.length) {
+        stmtsEl.style.display = 'block';
+        stmtsEl.innerHTML = stmts.map(function(s, i) {
+          return '<div class="ca-exam-stmt"><span class="ca-exam-stmt-num">' + (i+1) + '</span><span>' + esc(s) + '</span></div>';
+        }).join('');
+      } else {
+        stmtsEl.style.display = 'none';
+      }
     }
 
     // Options
     var opts    = ['a','b','c','d'];
     var optTxts = [q.option_a, q.option_b, q.option_c, q.option_d];
     var selected = saved[q.id] || null;
-    el('exam-opts').innerHTML = opts.map(function(letter, i) {
+    var optsEl = el('exam-opts');
+    if (optsEl) optsEl.innerHTML = opts.map(function(letter, i) {
       var isSelected = selected === letter;
       return '<button class="ca-exam-opt' + (isSelected ? ' ca-exam-opt--selected' : '') + '" ' +
         'onclick="CIASApp.selectOpt(this,\'' + letter + '\',' + q.id + ')" ' +
@@ -667,7 +692,8 @@ var CIASApp = (function () {
     }).join('');
 
     // Prev/Next buttons
-    el('exam-prev').disabled = idx === 0;
+    var prevBtn = el('exam-prev');
+    if (prevBtn) prevBtn.disabled = idx === 0;
     var nextBtn = el('exam-next');
     if (nextBtn) nextBtn.textContent = idx === tot - 1 ? 'Review' : 'Next ›';
 
@@ -1123,6 +1149,7 @@ var CIASApp = (function () {
   return {
     boot:          boot,
     goTab:         goTab,
+    goTests:       function() { goTab('tests'); loadTests(); },
     guruTab:       guruTab,
     fillQ:         fillQ,
     autoRes:       autoRes,
