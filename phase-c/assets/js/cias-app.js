@@ -58,7 +58,7 @@ var CIASApp = (function () {
   /* ── Boot ─────────────────────────────────────────────────── */
   function boot() {
     if (!D.user) return;
-    console.log('[CIAS] app version 3.21.0 loaded');
+    console.log('[CIAS] app version 3.21.1 loaded');
     sessionId = 'ses_' + D.user.id + '_' + Date.now().toString(36);
 
     // ── Init API + Chat modules FIRST (before any render calls) ────────────
@@ -659,20 +659,23 @@ var CIASApp = (function () {
     // Statements (for statement-type questions)
     var stmtsEl = el('exam-statements');
     var stmts = q.statements ? JSON.parse(q.statements) : [];
-    if (stmts && stmts.length) {
-      stmtsEl.style.display = 'block';
-      stmtsEl.innerHTML = stmts.map(function(s, i) {
-        return '<div class="ca-exam-stmt"><span class="ca-exam-stmt-num">' + (i+1) + '</span><span>' + esc(s) + '</span></div>';
-      }).join('');
-    } else {
-      stmtsEl.style.display = 'none';
+    if (stmtsEl) {
+      if (stmts && stmts.length) {
+        stmtsEl.style.display = 'block';
+        stmtsEl.innerHTML = stmts.map(function(s, i) {
+          return '<div class="ca-exam-stmt"><span class="ca-exam-stmt-num">' + (i+1) + '</span><span>' + esc(s) + '</span></div>';
+        }).join('');
+      } else {
+        stmtsEl.style.display = 'none';
+      }
     }
 
     // Options
     var opts    = ['a','b','c','d'];
     var optTxts = [q.option_a, q.option_b, q.option_c, q.option_d];
     var selected = saved[q.id] || null;
-    el('exam-opts').innerHTML = opts.map(function(letter, i) {
+    var optsEl = el('exam-opts');
+    if (optsEl) optsEl.innerHTML = opts.map(function(letter, i) {
       var isSelected = selected === letter;
       return '<button class="ca-exam-opt' + (isSelected ? ' ca-exam-opt--selected' : '') + '" ' +
         'onclick="CIASApp.selectOpt(this,\'' + letter + '\',' + q.id + ')" ' +
@@ -683,7 +686,8 @@ var CIASApp = (function () {
     }).join('');
 
     // Prev/Next buttons
-    el('exam-prev').disabled = idx === 0;
+    var prevBtn = el('exam-prev');
+    if (prevBtn) prevBtn.disabled = idx === 0;
     var nextBtn = el('exam-next');
     if (nextBtn) nextBtn.textContent = idx === tot - 1 ? 'Review' : 'Next ›';
 
