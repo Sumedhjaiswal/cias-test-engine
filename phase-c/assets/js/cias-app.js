@@ -58,7 +58,7 @@ var CIASApp = (function () {
   /* ── Boot ─────────────────────────────────────────────────── */
   function boot() {
     if (!D.user) return;
-    console.log('[CIAS] app version 3.21.2 loaded');
+    console.log('[CIAS] app version 3.21.3 loaded');
     sessionId = 'ses_' + D.user.id + '_' + Date.now().toString(36);
 
     // ── Init API + Chat modules FIRST (before any render calls) ────────────
@@ -1146,6 +1146,7 @@ var CIASApp = (function () {
   return {
     boot:          boot,
     goTab:         goTab,
+    goTests:       function() { goTab('tests'); loadTests(); },
     guruTab:       guruTab,
     fillQ:         fillQ,
     autoRes:       autoRes,
