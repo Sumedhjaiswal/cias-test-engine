@@ -58,7 +58,7 @@ var CIASApp = (function () {
   /* ── Boot ─────────────────────────────────────────────────── */
   function boot() {
     if (!D.user) return;
-    console.log('[CIAS] app version 3.21.3 loaded');
+    console.log('[CIAS] app version 3.21.4 loaded');
     sessionId = 'ses_' + D.user.id + '_' + Date.now().toString(36);
 
     // ── Init API + Chat modules FIRST (before any render calls) ────────────
@@ -554,7 +554,7 @@ var CIASApp = (function () {
         var pct = t.score !== null ? Math.round(t.score) : '--';
         var passed = t.score !== null && t.score >= (t.pass_mark || 60);
         badge = '<span class="ca-test-badge" style="background:' + (passed?'#dcfce7':'#fee2e2') + ';color:' + (passed?'#166534':'#991b1b') + '">' + pct + '% · ' + (passed?'Pass':'Fail') + '</span>';
-        btn   = '<button class="ca-btn-review-test" onclick="CIASApp.reviewTest(' + t.id + ')">Review Answers</button>';
+        btn   = '<button class="ca-btn-review-test" onclick="CIASApp.reviewTest(' + (t.attempt_id || 0) + ')">Review Answers</button>';
       } else if (t.status === 'upcoming') {
         badge = '<span class="ca-test-badge" style="background:#f3f4f6;color:#6b7280">⏰ Upcoming</span>';
         btn   = '<button class="ca-btn-start-test" disabled style="opacity:.5;cursor:not-allowed">Not yet available</button>';

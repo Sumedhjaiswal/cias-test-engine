@@ -202,6 +202,7 @@ class CIAS_Ajax {
 
                 $structured[] = [
                     'id'           => (int)$t->id,
+                    'attempt_id'   => $is_done ? (int)$t->attempt_id : 0,
                     'title'        => $t->title,
                     'subject_name' => $t->subject_name ?? 'General',
                     'subject_color'=> $t->subject_color ?? '#6C63FF',
