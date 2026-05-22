@@ -972,6 +972,22 @@ class CIAS_Test_Engine {
             echo '<div class="notice notice-success"><p>Question deleted.</p></div>';
         }
 
+        // ── AI question review: approve / reject ──
+        if (isset($_GET['approve']) && current_user_can('manage_options')
+            && check_admin_referer('cias_q_review')) {
+            $wpdb->update($wpdb->prefix.'cias_questions',
+                ['status'=>'published'], ['id'=>intval($_GET['approve'])]);
+            wp_cache_flush();
+            echo '<div class="notice notice-success"><p>✅ Question approved and published.</p></div>';
+        }
+        if (isset($_GET['reject']) && current_user_can('manage_options')
+            && check_admin_referer('cias_q_review')) {
+            $wpdb->update($wpdb->prefix.'cias_questions',
+                ['status'=>'rejected'], ['id'=>intval($_GET['reject'])]);
+            wp_cache_flush();
+            echo '<div class="notice notice-success"><p>Question rejected (hidden from practice).</p></div>';
+        }
+
         $action   = $_GET['action'] ?? 'list';
         $editing  = ($action === 'edit' && isset($_GET['id']))
             ? $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}cias_questions WHERE id=%d", intval($_GET['id'])))
@@ -1320,11 +1336,15 @@ function toggleTagStyle(cb) {
         <?php else:
             $filter_sub = intval($_GET['subject'] ?? 0);
             $filter_type= sanitize_text_field($_GET['qtype'] ?? '');
+            $filter_status = sanitize_text_field($_GET['qstatus'] ?? '');
             $sql = "SELECT q.*, s.name AS subject_name FROM {$wpdb->prefix}cias_questions q LEFT JOIN {$wpdb->prefix}cias_subjects s ON q.subject_id=s.id WHERE 1=1";
-            if ($filter_sub)  $sql .= $wpdb->prepare(" AND q.subject_id=%d", $filter_sub);
-            if ($filter_type) $sql .= $wpdb->prepare(" AND q.question_type=%s", $filter_type);
+            if ($filter_sub)    $sql .= $wpdb->prepare(" AND q.subject_id=%d", $filter_sub);
+            if ($filter_type)   $sql .= $wpdb->prepare(" AND q.question_type=%s", $filter_type);
+            if ($filter_status) $sql .= $wpdb->prepare(" AND q.status=%s", $filter_status);
             $sql .= " ORDER BY q.id DESC";
             $questions = $wpdb->get_results($sql);
+            // Count AI questions awaiting review (for the banner)
+            $pending_ai = intval($wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}cias_questions WHERE status='ai_pending_review'"));
             $type_labels = ['standard'=>'📝 Standard','statement'=>'📋 Statement','match'=>'🔀 Match','assertion'=>'⚖️ Assertion'];
         ?>
 <div class="wrap">
@@ -1334,14 +1354,32 @@ function toggleTagStyle(cb) {
   <a href="?page=cias-questions&action=add" class="button button-primary" style="margin-left:auto">+ Add Question</a>
 </h1>
 
+<?php if ($pending_ai > 0): ?>
+<div style="background:#fffbeb;border:1px solid #fcd34d;border-left:4px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+  <span style="font-size:20px">🤖</span>
+  <div style="flex:1">
+    <strong style="color:#92400e"><?php echo $pending_ai; ?> AI-generated question<?php echo $pending_ai === 1 ? '' : 's'; ?> awaiting your review</strong>
+    <div style="font-size:12px;color:#b45309;margin-top:2px">These were auto-generated when the question bank ran short. They are hidden from students until you approve them.</div>
+  </div>
+  <a href="?page=cias-questions&qstatus=ai_pending_review" class="button" style="font-size:13px">Review now →</a>
+</div>
+<?php endif; ?>
+
 <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-  <select onchange="location='?page=cias-questions&subject='+this.value+'&qtype=<?php echo esc_attr($filter_type); ?>'" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
+  <select onchange="location='?page=cias-questions&subject='+this.value+'&qtype=<?php echo esc_attr($filter_type); ?>&qstatus=<?php echo esc_attr($filter_status); ?>'" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
     <option value="0">All subjects</option>
     <?php foreach($subjects as $s): ?><option value="<?php echo $s->id; ?>" <?php selected($filter_sub,$s->id); ?>><?php echo esc_html($s->name); ?></option><?php endforeach; ?>
   </select>
-  <select onchange="location='?page=cias-questions&subject=<?php echo $filter_sub; ?>&qtype='+this.value" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
+  <select onchange="location='?page=cias-questions&subject=<?php echo $filter_sub; ?>&qtype='+this.value+'&qstatus=<?php echo esc_attr($filter_status); ?>'" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
     <option value="">All types</option>
     <?php foreach($type_labels as $v=>$l): ?><option value="<?php echo $v; ?>" <?php selected($filter_type,$v); ?>><?php echo $l; ?></option><?php endforeach; ?>
+  </select>
+  <select onchange="location='?page=cias-questions&subject=<?php echo $filter_sub; ?>&qtype=<?php echo esc_attr($filter_type); ?>&qstatus='+this.value" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
+    <option value="">All statuses</option>
+    <option value="published" <?php selected($filter_status,'published'); ?>>Published</option>
+    <option value="ai_pending_review" <?php selected($filter_status,'ai_pending_review'); ?>>AI — pending review</option>
+    <option value="draft" <?php selected($filter_status,'draft'); ?>>Draft</option>
+    <option value="rejected" <?php selected($filter_status,'rejected'); ?>>Rejected</option>
   </select>
 </div>
 
@@ -1384,8 +1422,19 @@ function toggleTagStyle(cb) {
     <td style="font-size:12px"><?php echo esc_html($q->subject_name??'—'); ?></td>
     <td><span style="font-size:11px;padding:2px 8px;border-radius:99px;background:<?php echo $q->difficulty==='easy'?'#dcfce7':($q->difficulty==='hard'?'#fee2e2':'#fef3c7'); ?>;color:<?php echo $q->difficulty==='easy'?'#166534':($q->difficulty==='hard'?'#991b1b':'#92400e'); ?>"><?php echo esc_html($q->difficulty); ?></span></td>
     <td style="font-size:12px"><?php echo $q->year_asked ? intval($q->year_asked) : '—'; ?></td>
-    <td><span style="font-size:11px;padding:2px 8px;border-radius:99px;background:<?php echo $q->status==='published'?'#dcfce7':'#f3f4f6'; ?>;color:<?php echo $q->status==='published'?'#166534':'#6b7280'; ?>"><?php echo esc_html($q->status); ?></span></td>
+    <td><span style="font-size:11px;padding:2px 8px;border-radius:99px;background:<?php
+      echo $q->status==='published'?'#dcfce7':($q->status==='ai_pending_review'?'#fef3c7':($q->status==='rejected'?'#fee2e2':'#f3f4f6')); ?>;color:<?php
+      echo $q->status==='published'?'#166534':($q->status==='ai_pending_review'?'#92400e':($q->status==='rejected'?'#991b1b':'#6b7280')); ?>"><?php
+      echo $q->status==='ai_pending_review'?'AI · pending':esc_html($q->status); ?></span>
+      <?php if (($q->source ?? 'manual')==='ai'): ?>
+      <div style="font-size:10px;color:#7c3aed;margin-top:3px">🤖 AI-generated</div>
+      <?php endif; ?>
+    </td>
     <td>
+      <?php if ($q->status==='ai_pending_review'): ?>
+      <a href="<?php echo wp_nonce_url('?page=cias-questions&approve='.$q->id, 'cias_q_review'); ?>" style="font-size:12px;color:#166534;font-weight:600">Approve</a> |
+      <a href="<?php echo wp_nonce_url('?page=cias-questions&reject='.$q->id, 'cias_q_review'); ?>" style="font-size:12px;color:#dc2626" onclick="return confirm('Reject this AI question? It will be hidden from practice.')">Reject</a><br>
+      <?php endif; ?>
       <a href="?page=cias-questions&action=edit&id=<?php echo $q->id; ?>" style="font-size:12px">Edit</a> |
       <a href="?page=cias-questions&delete=<?php echo $q->id; ?>" style="font-size:12px;color:#dc2626" onclick="return confirm('Delete this question?')">Del</a>
     </td>
