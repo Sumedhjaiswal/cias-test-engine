@@ -122,6 +122,11 @@ class CIAS_REST_Guru {
 
         $job_id = CIAS_DB_Phase_B::push_job( $job_type, $payload, priority: 2 );
 
+        // Signal WP-Cron processor to run immediately (no server cron needed)
+        if ( $job_id && $job_type === 'guru_chat' ) {
+            do_action( 'cias_guru_job_pushed', $job_id );
+        }
+
         // ── Deduct credit now (deduction happens even if job fails later) ──
         CIAS_AI_Bot::deduct_credit( $user_id, $can['type'], $session_id );
 
