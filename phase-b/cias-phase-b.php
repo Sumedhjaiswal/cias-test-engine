@@ -80,3 +80,118 @@ add_action( 'plugins_loaded', function () {
 
 // ── Register activation for Phase B ───────────────────────────────────────
 register_activation_hook( CIAS_PLUGIN_FILE, [ 'CIAS_DB_Phase_B', 'install' ] );
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WP-CRON JOB PROCESSOR — fallback when no server cron is configured
+//
+// Fires every minute via WP-Cron (triggered by page loads).
+// Processes pending guru_chat jobs inline using the same logic as the CLI worker.
+// Safe: uses a DB lock (transient) to prevent overlapping runs.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Register a 1-minute WP-Cron interval if not already defined
+add_filter( 'cron_schedules', function ( $schedules ) {
+    if ( ! isset( $schedules['cias_every_minute'] ) ) {
+        $schedules['cias_every_minute'] = [
+            'interval' => 60,
+            'display'  => 'Every Minute (CIAS)',
+        ];
+    }
+    return $schedules;
+} );
+
+// Schedule the cron event on plugin load if not already scheduled
+add_action( 'plugins_loaded', function () {
+    if ( ! wp_next_scheduled( 'cias_process_jobs' ) ) {
+        wp_schedule_event( time(), 'cias_every_minute', 'cias_process_jobs' );
+    }
+}, 30 );
+
+// The cron callback — processes pending guru_chat jobs
+add_action( 'cias_process_jobs', 'cias_run_wpcron_job_processor' );
+
+function cias_run_wpcron_job_processor(): void {
+    // Lock: prevent overlapping runs (transient expires in 90s)
+    if ( get_transient( 'cias_job_processor_running' ) ) return;
+    set_transient( 'cias_job_processor_running', 1, 90 );
+
+    try {
+        $worker_id  = 'wpcron:' . getmypid() . ':' . time();
+        $max_jobs   = 5;
+        $processed  = 0;
+        $start      = microtime( true );
+
+        while ( $processed < $max_jobs && ( microtime( true ) - $start ) < 25 ) {
+            $job = CIAS_DB_Phase_B::claim_next_job( 'guru_chat', $worker_id );
+            if ( ! $job ) break;
+
+            $payload = json_decode( $job->payload_json, true ) ?: [];
+
+            try {
+                $result = cias_process_guru_chat_job( $payload );
+                CIAS_DB_Phase_B::complete_job( (int) $job->id, $result );
+            } catch ( \Throwable $e ) {
+                CIAS_DB_Phase_B::fail_job( (int) $job->id, $e->getMessage() );
+            }
+
+            $processed++;
+        }
+    } finally {
+        delete_transient( 'cias_job_processor_running' );
+    }
+}
+
+function cias_process_guru_chat_job( array $payload ): array {
+    $user_id    = (int) ( $payload['user_id']    ?? 0 );
+    $session_id = (string) ( $payload['session_id'] ?? '' );
+    $message    = (string) ( $payload['message']    ?? '' );
+
+    if ( ! $user_id || ! $message ) {
+        throw new \InvalidArgumentException( 'Missing user_id or message in guru_chat payload.' );
+    }
+
+    // Load student profile
+    $profile = method_exists( 'CAIG_Data', 'get_profile' )
+        ? CAIG_Data::get_profile( $user_id )
+        : [];
+
+    // Load last 6 messages from chat history for context
+    global $wpdb;
+    $rows = $wpdb->get_results( $wpdb->prepare(
+        "SELECT role, body AS content
+         FROM {$wpdb->prefix}cias_chat_messages
+         WHERE user_id = %d AND session_id = %s
+         ORDER BY created_at DESC LIMIT 6",
+        $user_id, $session_id
+    ) );
+    $history = array_reverse(
+        array_map( fn( $r ) => [ 'role' => $r->role, 'content' => $r->content ], $rows )
+    );
+
+    // Call Claude via CAIG_AI::guru_chat (same as sync path)
+    $response = CAIG_AI::guru_chat( $profile, $message, $history );
+
+    // Persist assistant reply to chat history
+    do_action( 'cias_guru_assistant_message', [
+        'session_id' => $session_id,
+        'user_id'    => $user_id,
+        'body'       => $response,
+        'tokens'     => null,
+    ] );
+
+    return [
+        'response'   => $response,
+        'session_id' => $session_id,
+        'user_id'    => $user_id,
+    ];
+}
+
+// Also trigger immediately when a guru_chat job is pushed (via shutdown hook)
+// This gives sub-minute response times on active pages without waiting for cron
+add_action( 'cias_guru_job_pushed', function ( $job_id ) {
+    // Fire async HTTP request to wp-cron so it processes without blocking the user
+    if ( ! get_transient( 'cias_job_processor_running' ) ) {
+        wp_schedule_single_event( time(), 'cias_process_jobs' );
+        spawn_cron();
+    }
+} );
