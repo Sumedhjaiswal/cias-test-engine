@@ -988,6 +988,31 @@ class CIAS_Test_Engine {
             echo '<div class="notice notice-success"><p>Question rejected (hidden from practice).</p></div>';
         }
 
+        // ── Manual AI generation trigger (queues an async job) ──
+        if (isset($_POST['cias_gen_questions']) && current_user_can('manage_options')
+            && check_admin_referer('cias_gen_q')) {
+            $gen_subject  = intval($_POST['gen_subject_id'] ?? 0);
+            $gen_topic    = intval($_POST['gen_topic_id'] ?? 0);
+            $gen_subtopic = intval($_POST['gen_subtopic_id'] ?? 0);
+            $gen_count    = max(1, min(15, intval($_POST['gen_count'] ?? 5)));
+            if ($gen_subject > 0 && class_exists('CIAS_DB_Phase_B')) {
+                $job_id = CIAS_DB_Phase_B::push_job('generate_questions', [
+                    'subject_id'  => $gen_subject,
+                    'topic_id'    => $gen_topic,
+                    'subtopic_id' => $gen_subtopic,
+                    'count'       => $gen_count,
+                ], 5, 0);
+                if ($job_id) {
+                    do_action('cias_generate_job_pushed', $job_id);
+                    echo '<div class="notice notice-success"><p>🤖 Generation job #'.intval($job_id).' queued. Questions will appear here for review within a minute or two (once the worker runs).</p></div>';
+                } else {
+                    echo '<div class="notice notice-error"><p>Could not queue the generation job. Check the job queue.</p></div>';
+                }
+            } else {
+                echo '<div class="notice notice-error"><p>Please choose a subject (and ensure Phase B is active).</p></div>';
+            }
+        }
+
         $action   = $_GET['action'] ?? 'list';
         $editing  = ($action === 'edit' && isset($_GET['id']))
             ? $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}cias_questions WHERE id=%d", intval($_GET['id'])))
@@ -1364,6 +1389,32 @@ function toggleTagStyle(cb) {
   <a href="?page=cias-questions&qstatus=ai_pending_review" class="button" style="font-size:13px">Review now →</a>
 </div>
 <?php endif; ?>
+
+<details style="margin-bottom:14px;border:1px solid #e5e7eb;border-radius:8px;padding:0 14px">
+  <summary style="cursor:pointer;padding:12px 0;font-weight:600;color:#6C63FF">🤖 Generate practice questions with AI</summary>
+  <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;padding:0 0 14px">
+    <?php wp_nonce_field('cias_gen_q'); ?>
+    <div>
+      <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">Subject</label>
+      <select name="gen_subject_id" required style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
+        <option value="0">Select…</option>
+        <?php foreach($subjects as $s): ?><option value="<?php echo $s->id; ?>"><?php echo esc_html($s->name); ?></option><?php endforeach; ?>
+      </select>
+    </div>
+    <div>
+      <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">Topic ID (optional)</label>
+      <input type="number" name="gen_topic_id" value="0" min="0" style="width:120px;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
+    </div>
+    <div>
+      <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">How many</label>
+      <select name="gen_count" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
+        <option value="3">3</option><option value="5" selected>5</option><option value="10">10</option><option value="15">15</option>
+      </select>
+    </div>
+    <button type="submit" name="cias_gen_questions" value="1" class="button button-primary">Queue generation →</button>
+    <p style="width:100%;margin:8px 0 0;font-size:12px;color:#9ca3af">Questions are generated in the background and land here as <strong>pending review</strong>. They stay hidden from students until you approve them.</p>
+  </form>
+</details>
 
 <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
   <select onchange="location='?page=cias-questions&subject='+this.value+'&qtype=<?php echo esc_attr($filter_type); ?>&qstatus=<?php echo esc_attr($filter_status); ?>'" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
