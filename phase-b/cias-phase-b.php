@@ -48,6 +48,7 @@ require_once CIAS_PHASE_B_DIR . 'class-cias-r2.php';
 require_once CIAS_PHASE_B_DIR . 'class-cias-queue.php';
 require_once CIAS_PHASE_B_DIR . 'class-cias-ocr.php';
 require_once CIAS_PHASE_B_DIR . 'class-cias-evaluator.php';
+require_once CIAS_PHASE_B_DIR . 'class-cias-question-generator.php';
 require_once CIAS_PHASE_B_DIR . 'class-cias-rest-upload.php';
 require_once CIAS_PHASE_B_DIR . 'class-cias-rest-answers.php';
 require_once CIAS_PHASE_B_DIR . 'class-cias-rest-guru.php';
