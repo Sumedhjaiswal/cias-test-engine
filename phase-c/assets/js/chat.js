@@ -205,13 +205,15 @@ window.CIASChat = (function () {
 
   function _processTextChat(txt, loadDiv) {
     CIAS_API.restPost('/guru/chat', { message: txt, session_id: _sessionId }, function (res) {
-      if (res && res.job_id) {
+      // res is normalized envelope: { success, data: { job_id, session_id }, error }
+      var d = (res && res.data) ? res.data : {};
+      if (res && res.success && d.job_id) {
         // ── Async path: job queued, poll for result ────────────────────────
         _removeLoadDiv(loadDiv);
-        _currentJob = res.job_id;
-        _sessionId  = res.session_id || _sessionId;
+        _currentJob = d.job_id;
+        _sessionId  = d.session_id || _sessionId;
 
-        pollJob(res.job_id, function (result) {
+        pollJob(d.job_id, function (result) {
           if (result && result.response) {
             appendBotMsg(_esc(result.response));
           } else {
@@ -222,7 +224,7 @@ window.CIASChat = (function () {
       } else if (res && res.error) {
         // REST returned error (402 credits, 429 rate limit, etc.)
         _removeLoadDiv(loadDiv);
-        var errMsg = res.error || 'Could not send message.';
+        var errMsg = (res.error && res.error.message) ? res.error.message : 'Could not send message.';
         appendBotMsg(errMsg);
       } else {
         // REST failed to return job_id — worker may be down
@@ -316,8 +318,8 @@ window.CIASChat = (function () {
       image_mime: 'image/jpeg'
     }, function (res) {
       _removeLoadDiv(loadDiv);
-      if (res && res.job_id) {
-        pollJob(res.job_id, function (result) {
+      if (res && res.success && res.data && res.data.job_id) {
+        pollJob(res.data.job_id, function (result) {
           appendBotMsg(result && result.response ? _esc(result.response) : 'Evaluation complete. Please check your Progress tab.');
         });
       } else {
