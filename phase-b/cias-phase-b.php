@@ -55,6 +55,7 @@ require_once CIAS_PHASE_B_DIR . 'class-cias-rest-status.php';
 require_once CIAS_PHASE_B_DIR . 'class-cias-analytics-aggregator.php';
 require_once CIAS_PHASE_B_DIR . 'class-cias-teacher-review.php';
 require_once CIAS_PHASE_B_DIR . 'class-cias-ops-monitor.php';
+require_once CIAS_PHASE_B_DIR . 'class-cias-question-generator.php';
 
 // ── DB install on version mismatch ─────────────────────────────────────────
 add_action( 'plugins_loaded', function () {
@@ -122,19 +123,39 @@ function cias_run_wpcron_job_processor(): void {
         $start      = microtime( true );
 
         while ( $processed < $max_jobs && ( microtime( true ) - $start ) < 25 ) {
+            // Process guru_chat jobs first (fast, user-facing)
             $job = CIAS_DB_Phase_B::claim_next_job( 'guru_chat', $worker_id );
-            if ( ! $job ) break;
-
-            $payload = json_decode( $job->payload_json, true ) ?: [];
-
-            try {
-                $result = cias_process_guru_chat_job( $payload );
-                CIAS_DB_Phase_B::complete_job( (int) $job->id, $result );
-            } catch ( \Throwable $e ) {
-                CIAS_DB_Phase_B::fail_job( (int) $job->id, $e->getMessage() );
+            if ( $job ) {
+                $payload = json_decode( $job->payload_json, true ) ?: [];
+                try {
+                    $result = cias_process_guru_chat_job( $payload );
+                    CIAS_DB_Phase_B::complete_job( (int) $job->id, $result );
+                } catch ( \Throwable $e ) {
+                    CIAS_DB_Phase_B::fail_job( (int) $job->id, $e->getMessage() );
+                }
+                $processed++;
+                continue;
             }
 
-            $processed++;
+            // Then process generate_questions jobs (heavier, admin-facing)
+            $gen = CIAS_DB_Phase_B::claim_next_job( 'generate_questions', $worker_id );
+            if ( $gen ) {
+                $payload = json_decode( $gen->payload_json, true ) ?: [];
+                try {
+                    if ( ! class_exists( 'CIAS_Question_Generator' ) ) {
+                        require_once CIAS_PHASE_B_DIR . 'class-cias-question-generator.php';
+                    }
+                    $result = CIAS_Question_Generator::generate( $payload );
+                    CIAS_DB_Phase_B::complete_job( (int) $gen->id, $result );
+                } catch ( \Throwable $e ) {
+                    CIAS_DB_Phase_B::fail_job( (int) $gen->id, $e->getMessage() );
+                }
+                $processed++;
+                continue;
+            }
+
+            // No jobs of either type — stop
+            break;
         }
     } finally {
         delete_transient( 'cias_job_processor_running' );
@@ -190,6 +211,14 @@ function cias_process_guru_chat_job( array $payload ): array {
 // This gives sub-minute response times on active pages without waiting for cron
 add_action( 'cias_guru_job_pushed', function ( $job_id ) {
     // Fire async HTTP request to wp-cron so it processes without blocking the user
+    if ( ! get_transient( 'cias_job_processor_running' ) ) {
+        wp_schedule_single_event( time(), 'cias_process_jobs' );
+        spawn_cron();
+    }
+} );
+
+// Trigger immediate processing when a generate_questions job is queued from admin.
+add_action( 'cias_generate_job_pushed', function ( $job_id ) {
     if ( ! get_transient( 'cias_job_processor_running' ) ) {
         wp_schedule_single_event( time(), 'cias_process_jobs' );
         spawn_cron();
