@@ -335,7 +335,8 @@ window.CIASChat = (function () {
     var maxAttempts = 30; // 60 seconds max
 
     function check() {
-      CIAS_API.ajaxPost('cias_job_poll', { job_id: jobId }, function (res) {
+      // Uses REST GET /wp-json/cias/v1/job/{id}/status (not an AJAX action)
+      CIAS_API.restGet('/job/' + jobId + '/status', function (res) {
         attempts++;
         if (!res || !res.success) {
           if (attempts < maxAttempts) setTimeout(check, 2000);
@@ -357,7 +358,8 @@ window.CIASChat = (function () {
 
     function check() {
       attempts++;
-      CIAS_API.ajaxPost('cias_job_poll', { job_id: jobId }, function (res) {
+      // Uses REST GET /wp-json/cias/v1/job/{id}/status (not an AJAX action)
+      CIAS_API.restGet('/job/' + jobId + '/status', function (res) {
         if (!res || !res.success) {
           if (attempts < 30) setTimeout(check, 2000);
           return;
