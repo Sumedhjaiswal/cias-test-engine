@@ -34,6 +34,7 @@ window.CIASChat = (function () {
   /* ── Private state ─────────────────────────────────────────────────────── */
   var _D          = {};          // shared app data (set by init)
   var _sessionId  = '';
+  var _chatHistory = [];         // [{role, content}] — last few turns for context
   var _imgData    = null;
   var _imgFile    = null;
   var _currentJob = null;
@@ -204,34 +205,58 @@ window.CIASChat = (function () {
   ══════════════════════════════════════════════════════════════════════════ */
 
   function _processTextChat(txt, loadDiv) {
-    CIAS_API.restPost('/guru/chat', { message: txt, session_id: _sessionId }, function (res) {
-      // res is normalized envelope: { success, data: { job_id, session_id }, error }
-      var d = (res && res.data) ? res.data : {};
-      if (res && res.success && d.job_id) {
-        // ── Async path: job queued, poll for result ────────────────────────
-        _removeLoadDiv(loadDiv);
-        _currentJob = d.job_id;
-        _sessionId  = d.session_id || _sessionId;
+    // Synchronous AJAX path — reliable, matches the original working AI Guru.
+    // Returns { success: true, data: { response, session_id, profile } }
+    CIAS_API.ajaxPost('caig_guru_chat', {
+      question:   txt,
+      session_id: _sessionId,
+      history:    JSON.stringify(_recentHistory())
+    }, function (res) {
+      _removeLoadDiv(loadDiv);
 
-        pollJob(d.job_id, function (result) {
-          if (result && result.response) {
-            appendBotMsg(_esc(result.response));
-          } else {
-            // ── Job failed — show retry, never call Claude synchronously ───
-            _showRetryError(txt);
-          }
-        });
-      } else if (res && res.error) {
-        // REST returned error (402 credits, 429 rate limit, etc.)
-        _removeLoadDiv(loadDiv);
-        var errMsg = (res.error && res.error.message) ? res.error.message : 'Could not send message.';
-        appendBotMsg(errMsg);
+      var d = (res && res.data) ? res.data : {};
+
+      if (res && res.success && d.response) {
+        _sessionId = d.session_id || _sessionId;
+        _chatHistory.push({ role: 'user', content: txt });
+        _chatHistory.push({ role: 'assistant', content: d.response });
+        if (_chatHistory.length > 12) _chatHistory = _chatHistory.slice(-12);
+        appendBotMsg(_fmtResponse(d.response));
+        if (d.profile) _updateHeroStats(d.profile);
       } else {
-        // REST failed to return job_id — worker may be down
-        _removeLoadDiv(loadDiv);
-        _showRetryError(txt);
+        var msg = (res && res.error && res.error.message)
+          ? res.error.message
+          : (d && d.message ? d.message : null);
+        if (msg) {
+          appendBotMsg(_esc(msg));
+        } else {
+          _showRetryError(txt);
+        }
       }
     });
+  }
+
+  function _recentHistory() {
+    // Pull the last few rendered messages from the chat area for context.
+    // Lightweight — server also persists full history independently.
+    return _chatHistory.slice(-6);
+  }
+
+  function _updateHeroStats(p) {
+    if (!p) return;
+    var s = _el('hero-streak'); if (s && p.streak != null) s.textContent = p.streak;
+    var a = _el('hero-avg');    if (a && p.avg != null)    a.textContent = p.avg + '%';
+    var t = _el('hero-tests');  if (t && p.tests != null)  t.textContent = p.tests;
+  }
+
+  function _fmtResponse(text) {
+    // Escape first (XSS-safe), then apply the same lightweight markdown
+    // the original working AI Guru used: **bold**, • bullets, newlines.
+    var safe = _esc(text || '');
+    return safe
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/•\s*/g, '<br>• ')
+      .replace(/\n/g, '<br>');
   }
 
   function _showRetryError(originalTxt) {
