@@ -631,31 +631,38 @@ class CIAS_Ajax {
         $db     = new CIAS_DB();
         $result = CIAS_Adaptive::generate($uid, $subject_id, $q_count, $topic_id, $subtopic_id);
 
-        if (empty($result['questions'])) {
-            // Middle-path auto top-up: queue a student-triggered generation job.
-            // Questions land as 'ai_auto' (live immediately + retroactive review).
-            // Rate-limited per subject+topic so a rush of students = one job, not many.
+        // Always top up the bank in the background when it can't satisfy the
+        // requested count — but only BLOCK the student (error) if there is
+        // nothing at all to practice. If we have some questions, let them
+        // practice what exists now and generate more for next time.
+        $have = is_array($result['questions'] ?? null) ? count($result['questions']) : 0;
+
+        if ($have < $q_count && class_exists('CIAS_DB_Phase_B')) {
+            // Rate-limit per subject+topic+subtopic so a rush = one job, not many.
             $lock_key = 'cias_autogen_' . $subject_id . '_' . $topic_id . '_' . $subtopic_id;
-            $queued   = false;
-            if (class_exists('CIAS_DB_Phase_B') && ! get_transient($lock_key)) {
-                set_transient($lock_key, 1, 10 * MINUTE_IN_SECONDS); // one job per scope per 10 min
+            if ( ! get_transient($lock_key) ) {
+                set_transient($lock_key, 1, 10 * MINUTE_IN_SECONDS);
+                // Generate enough to cover the shortfall (capped at 10 per job for cost).
+                $need   = max(1, min(10, $q_count - $have));
                 $job_id = CIAS_DB_Phase_B::push_job('generate_questions', [
-                    'subject_id'  => $subject_id,
-                    'topic_id'    => $topic_id,
-                    'subtopic_id' => $subtopic_id,
-                    'count'       => 5,
-                    'status'      => 'ai_auto',
+                    'subject_id'   => $subject_id,
+                    'topic_id'     => $topic_id,
+                    'subtopic_id'  => $subtopic_id,
+                    'count'        => $need,
+                    'status'       => 'ai_auto',
+                    'triggered_by' => $uid,   // analytics: which student caused it
                 ], 2, 0);
-                if ($job_id) {
-                    $queued = true;
-                    do_action('cias_generate_job_pushed', $job_id);
-                }
+                if ($job_id) do_action('cias_generate_job_pushed', $job_id);
             }
-            $msg = $queued
-                ? 'We\'re preparing fresh questions for this topic right now — please try again in a minute. 🤖'
-                : 'Not enough questions in the bank for this topic yet. More are on the way — please check back shortly.';
-            wp_send_json_error(['message' => $msg, 'autogen' => $queued]);
         }
+
+        if ($have === 0) {
+            wp_send_json_error([
+                'message' => 'We\'re preparing fresh questions for this topic right now — please try again in a minute. 🤖',
+                'autogen' => true,
+            ]);
+        }
+        // else: proceed with the $have questions we do have (may be < requested).
 
         // Create a virtual test + attempt in the DB so answer save/submit works
         global $wpdb;
