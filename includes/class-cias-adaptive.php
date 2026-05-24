@@ -38,25 +38,40 @@ class CIAS_Adaptive {
         if ($subtopic_id) $where .= " AND q.subtopic_id=" . intval($subtopic_id);
 
         // ── Join-date visibility gate ──────────────────────────────────────
-        // Subject-only practice (no explicit topic/subtopic drill) hides
-        // subtopics taught BEFORE the student joined. A subtopic's "taught date"
-        // is automatic: the creation date of its first published question.
-        // Explicitly drilling a topic/subtopic is a manual override that
-        // bypasses this gate so students can catch up on foundational material.
+        // Subject-only practice (no explicit topic/subtopic drill) hides content
+        // taught BEFORE the student joined. "Taught date" is automatic: the
+        // creation date of the first published question at that granularity.
+        // Handles three cases so subject-level questions (no subtopic) aren't lost:
+        //   - subtopic questions  → dated by subtopic's first question
+        //   - topic-only questions (subtopic_id=0) → dated by topic's first question
+        //   - subject-only questions (topic_id=0)  → dated by subject's first question
+        // Drilling a specific topic/subtopic bypasses this gate (manual catch-up).
         if (!$topic_id && !$subtopic_id) {
             $enrolled_at = self::get_student_join_date($user_id, $subject_id);
             if ($enrolled_at) {
+                $sid = intval($subject_id);
                 $where .= $wpdb->prepare(
-                    " AND q.subtopic_id IN (
-                        SELECT fq.subtopic_id FROM (
-                            SELECT subtopic_id, MIN(created_at) AS first_q
-                            FROM " . CIAS_QUESTIONS . "
-                            WHERE status='published' AND subject_id=%d AND subtopic_id>0
-                            GROUP BY subtopic_id
-                        ) fq
-                        WHERE fq.first_q >= %s
+                    " AND (
+                        ( q.subtopic_id > 0 AND q.subtopic_id IN (
+                            SELECT x.subtopic_id FROM (
+                                SELECT subtopic_id, MIN(created_at) f FROM " . CIAS_QUESTIONS . "
+                                WHERE status='published' AND subject_id=%d AND subtopic_id>0
+                                GROUP BY subtopic_id
+                            ) x WHERE x.f >= %s
+                        ) )
+                        OR ( q.subtopic_id = 0 AND q.topic_id > 0 AND q.topic_id IN (
+                            SELECT y.topic_id FROM (
+                                SELECT topic_id, MIN(created_at) f FROM " . CIAS_QUESTIONS . "
+                                WHERE status='published' AND subject_id=%d AND topic_id>0 AND subtopic_id=0
+                                GROUP BY topic_id
+                            ) y WHERE y.f >= %s
+                        ) )
+                        OR ( q.subtopic_id = 0 AND q.topic_id = 0 AND (
+                            SELECT MIN(created_at) FROM " . CIAS_QUESTIONS . "
+                            WHERE status='published' AND subject_id=%d AND topic_id=0 AND subtopic_id=0
+                        ) >= %s )
                     )",
-                    intval($subject_id), $enrolled_at
+                    $sid, $enrolled_at, $sid, $enrolled_at, $sid, $enrolled_at
                 );
             }
         }
@@ -125,13 +140,11 @@ class CIAS_Adaptive {
        LEVEL CALCULATION
     ══════════════════════════════════ */
     /**
-     * Earliest enrollment (join) date for a student. Used to gate which
-     * subtopics are visible in subject-only adaptive practice.
-     * Returns MySQL datetime string, or null if no enrollment found.
+     * Earliest active enrollment (join) date for a student. Gates which content
+     * is visible in subject-only adaptive practice. Returns MySQL datetime or null.
      */
     public static function get_student_join_date($user_id, $subject_id = 0) {
         global $wpdb;
-        // Earliest active enrollment across the student's batches.
         $date = $wpdb->get_var($wpdb->prepare(
             "SELECT MIN(enrolled_at) FROM " . CIAS_ENROLLMENTS . "
              WHERE user_id=%d AND status='active'",
