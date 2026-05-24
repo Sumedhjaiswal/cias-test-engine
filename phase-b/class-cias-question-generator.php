@@ -52,6 +52,10 @@ class CIAS_Question_Generator {
         // approved). Whitelist to prevent arbitrary status injection.
         $gen_status  = ( ( $payload['status'] ?? '' ) === 'ai_auto' ) ? 'ai_auto' : 'ai_pending_review';
 
+        // Which student (if any) triggered this auto-generation — for analytics.
+        // 0 = teacher/admin-triggered.
+        $gen_trigger_by = (int) ( $payload['triggered_by'] ?? 0 );
+
         if ( $subject_id <= 0 || $count <= 0 ) {
             return [ 'generated' => 0, 'reason' => 'Missing subject_id or count.' ];
         }
@@ -148,7 +152,7 @@ class CIAS_Question_Generator {
                 'explanation'    => $clean['explanation'],
                 'difficulty'     => $clean['difficulty'],
                 'source'         => 'ai',
-                'created_by'     => 0,
+                'created_by'     => $gen_trigger_by,
                 'status'         => $gen_status,
                 'created_at'     => current_time( 'mysql' ),
             ];
