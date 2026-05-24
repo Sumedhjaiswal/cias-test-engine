@@ -86,6 +86,36 @@ var CIASApp = (function () {
     renderInitialChat();
 
     goTab('home');
+    checkNotices();
+  }
+
+  // ── In-app notices: surface "your auto-generated questions are ready" ──────
+  function checkNotices() {
+    ajaxPost('cias_get_notices', {}, function (res) {
+      if (!res || !res.success || !res.data || !res.data.notices) return;
+      var list = res.data.notices;
+      if (!list.length) return;
+      // Show the most recent notice as a dismissible banner.
+      var n = list[list.length - 1];
+      showNoticeBanner(n.message || 'Your new questions are ready!');
+    });
+  }
+
+  function showNoticeBanner(msg) {
+    var existing = el('cias-notice-banner');
+    if (existing) existing.parentNode.removeChild(existing);
+    var bar = document.createElement('div');
+    bar.id = 'cias-notice-banner';
+    bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:78px;z-index:9999;background:#1e40af;color:#fff;padding:11px 16px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:90%;display:flex;align-items:center;gap:10px;animation:caFade .3s ease';
+    var txt = document.createElement('span');
+    txt.textContent = '⚡ ' + msg;
+    var x = document.createElement('span');
+    x.textContent = '✕';
+    x.style.cssText = 'cursor:pointer;opacity:.8;font-weight:400';
+    x.onclick = function () { bar.parentNode && bar.parentNode.removeChild(bar); };
+    bar.appendChild(txt); bar.appendChild(x);
+    document.body.appendChild(bar);
+    setTimeout(function () { if (bar.parentNode) bar.parentNode.removeChild(bar); }, 8000);
   }
 
   /* ── Topbar ───────────────────────────────────────────────── */
