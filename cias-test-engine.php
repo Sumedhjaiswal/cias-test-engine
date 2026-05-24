@@ -1394,6 +1394,7 @@ function toggleTagStyle(cb) {
             $questions = $wpdb->get_results($sql);
             // Count AI questions awaiting review (for the banner)
             $pending_ai = intval($wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}cias_questions WHERE status='ai_pending_review'"));
+            $auto_ai    = intval($wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}cias_questions WHERE status='ai_auto'"));
             $type_labels = ['standard'=>'📝 Standard','statement'=>'📋 Statement','match'=>'🔀 Match','assertion'=>'⚖️ Assertion'];
 
             // Topics & subtopics that ALREADY HAVE at least one question — the only
@@ -1434,6 +1435,17 @@ function toggleTagStyle(cb) {
     <div style="font-size:12px;color:#b45309;margin-top:2px">These were auto-generated when the question bank ran short. They are hidden from students until you approve them.</div>
   </div>
   <a href="?page=cias-questions&qstatus=ai_pending_review" class="button" style="font-size:13px">Review now →</a>
+</div>
+<?php endif; ?>
+
+<?php if ($auto_ai > 0): ?>
+<div style="background:#eff6ff;border:1px solid #93c5fd;border-left:4px solid #3b82f6;border-radius:8px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+  <span style="font-size:20px">⚡</span>
+  <div style="flex:1">
+    <strong style="color:#1e40af"><?php echo $auto_ai; ?> auto-generated question<?php echo $auto_ai === 1 ? '' : 's'; ?> are LIVE for students now</strong>
+    <div style="font-size:12px;color:#1d4ed8;margin-top:2px">These were generated automatically when a student hit an empty topic. They are visible to students immediately — please review and approve (or reject) them.</div>
+  </div>
+  <a href="?page=cias-questions&qstatus=ai_auto" class="button" style="font-size:13px">Review now →</a>
 </div>
 <?php endif; ?>
 
@@ -1508,6 +1520,7 @@ function toggleTagStyle(cb) {
     <option value="">All statuses</option>
     <option value="published" <?php selected($filter_status,'published'); ?>>Published</option>
     <option value="ai_pending_review" <?php selected($filter_status,'ai_pending_review'); ?>>AI — pending review</option>
+    <option value="ai_auto" <?php selected($filter_status,'ai_auto'); ?>>AI — auto (live)</option>
     <option value="draft" <?php selected($filter_status,'draft'); ?>>Draft</option>
     <option value="rejected" <?php selected($filter_status,'rejected'); ?>>Rejected</option>
   </select>
@@ -1587,17 +1600,17 @@ function ciasUpdateCount(){
     <td><span style="font-size:11px;padding:2px 8px;border-radius:99px;background:<?php echo $q->difficulty==='easy'?'#dcfce7':($q->difficulty==='hard'?'#fee2e2':'#fef3c7'); ?>;color:<?php echo $q->difficulty==='easy'?'#166534':($q->difficulty==='hard'?'#991b1b':'#92400e'); ?>"><?php echo esc_html($q->difficulty); ?></span></td>
     <td style="font-size:12px"><?php echo $q->year_asked ? intval($q->year_asked) : '—'; ?></td>
     <td><span style="font-size:11px;padding:2px 8px;border-radius:99px;background:<?php
-      echo $q->status==='published'?'#dcfce7':($q->status==='ai_pending_review'?'#fef3c7':($q->status==='rejected'?'#fee2e2':'#f3f4f6')); ?>;color:<?php
-      echo $q->status==='published'?'#166534':($q->status==='ai_pending_review'?'#92400e':($q->status==='rejected'?'#991b1b':'#6b7280')); ?>"><?php
-      echo $q->status==='ai_pending_review'?'AI · pending':esc_html($q->status); ?></span>
+      echo $q->status==='published'?'#dcfce7':($q->status==='ai_pending_review'?'#fef3c7':($q->status==='ai_auto'?'#dbeafe':($q->status==='rejected'?'#fee2e2':'#f3f4f6'))); ?>;color:<?php
+      echo $q->status==='published'?'#166534':($q->status==='ai_pending_review'?'#92400e':($q->status==='ai_auto'?'#1e40af':($q->status==='rejected'?'#991b1b':'#6b7280'))); ?>"><?php
+      echo $q->status==='ai_pending_review'?'AI · pending':($q->status==='ai_auto'?'⚡ AI · live':esc_html($q->status)); ?></span>
       <?php if (($q->source ?? 'manual')==='ai'): ?>
       <div style="font-size:10px;color:#7c3aed;margin-top:3px">🤖 AI-generated</div>
       <?php endif; ?>
     </td>
     <td>
-      <?php if ($q->status==='ai_pending_review'): ?>
-      <a href="<?php echo wp_nonce_url('?page=cias-questions&approve='.$q->id, 'cias_q_review'); ?>" style="font-size:12px;color:#166534;font-weight:600">Approve</a> |
-      <a href="<?php echo wp_nonce_url('?page=cias-questions&reject='.$q->id, 'cias_q_review'); ?>" style="font-size:12px;color:#dc2626" onclick="return confirm('Reject this AI question? It will be hidden from practice.')">Reject</a><br>
+      <?php if ($q->status==='ai_pending_review' || $q->status==='ai_auto'): ?>
+      <a href="<?php echo wp_nonce_url('?page=cias-questions&approve='.$q->id, 'cias_q_review'); ?>" style="font-size:12px;color:#166534;font-weight:600"><?php echo $q->status==='ai_auto'?'Approve (bless)':'Approve'; ?></a> |
+      <a href="<?php echo wp_nonce_url('?page=cias-questions&reject='.$q->id, 'cias_q_review'); ?>" style="font-size:12px;color:#dc2626" onclick="return confirm('Reject this question? It will be hidden from students.')">Reject</a><br>
       <?php endif; ?>
       <a href="?page=cias-questions&action=edit&id=<?php echo $q->id; ?>" style="font-size:12px">Edit</a> |
       <a href="?page=cias-questions&delete=<?php echo $q->id; ?>" style="font-size:12px;color:#dc2626" onclick="return confirm('Delete this question?')">Del</a>
