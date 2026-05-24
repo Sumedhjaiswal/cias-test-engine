@@ -312,6 +312,7 @@ class CIAS_Test_Engine {
         add_submenu_page('cias-tests', 'Parents',          'Parents',         'manage_options',           'cias-parents',            [$this,'page_parents']);
         add_submenu_page('cias-tests', 'Communication Logs','Comms Logs',     'manage_options',           'cias-wa-logs',            [$this,'page_wa_logs']);
         add_submenu_page('cias-tests', '🤖 AI Usage',      '🤖 AI Usage',    'manage_options',           'cias-ai-usage',           [$this,'page_ai_usage']);
+        add_submenu_page('cias-tests', '📊 AI & Practice Activity','📊 Activity','manage_options',        'cias-practice-activity',  [$this,'page_practice_activity']);
         add_submenu_page('cias-tests', 'Access Control',   'Access Control',  'manage_options',           'cias-access-control',     [$this,'page_access_control']);
         add_submenu_page('cias-tests', '🧠 AI Guru',        '🧠 AI Guru',      'manage_options',           'cias-ai-guru',            [$this,'page_ai_guru']);
         add_submenu_page('cias-tests', '🎬 Lecture Mgr',    '🎬 Lecture Mgr',  'cias_use_content_manager', 'cias-lecture-mgr',        [$this,'page_lecture_mgr']);
@@ -2860,6 +2861,157 @@ function filterBatch(bid) {
         <?php
     }
 
+    /* ── AI & Practice Activity (read-only analytics) ── */
+    public function page_practice_activity() {
+        if (!current_user_can('manage_options')) wp_die('Insufficient permissions.');
+        global $wpdb;
+        $P  = $wpdb->prefix;
+        $QT = $P.'cias_questions';
+        $AD = $P.'cias_adaptive';
+
+        // ── Auto-generated questions per triggering student ──
+        $gen_per_student = $wpdb->get_results(
+            "SELECT q.created_by AS user_id, u.display_name, u.user_email,
+                    COUNT(*) AS total,
+                    SUM(q.status='ai_auto') AS live,
+                    SUM(q.status='published') AS approved,
+                    SUM(q.status='rejected') AS rejected
+             FROM {$QT} q
+             LEFT JOIN {$wpdb->users} u ON u.ID=q.created_by
+             WHERE q.source='ai' AND q.created_by > 0
+             GROUP BY q.created_by
+             ORDER BY total DESC
+             LIMIT 50"
+        );
+
+        // ── Practice sessions per student (last 30 days) ──
+        $practice_per_student = $wpdb->get_results(
+            "SELECT a.user_id, u.display_name, u.user_email,
+                    COUNT(*) AS sessions,
+                    MAX(a.created_at) AS last_active
+             FROM {$AD} a
+             LEFT JOIN {$wpdb->users} u ON u.ID=a.user_id
+             WHERE a.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+             GROUP BY a.user_id
+             ORDER BY sessions DESC
+             LIMIT 50"
+        );
+
+        // ── Most-practiced topics (last 30 days) ──
+        $top_topics = $wpdb->get_results(
+            "SELECT a.subject_id, a.topic_id, s.name AS subject, t.name AS topic,
+                    COUNT(*) AS sessions
+             FROM {$AD} a
+             LEFT JOIN {$P}cias_subjects s ON a.subject_id=s.id
+             LEFT JOIN {$P}cias_topics   t ON a.topic_id=t.id
+             WHERE a.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+             GROUP BY a.subject_id, a.topic_id
+             ORDER BY sessions DESC
+             LIMIT 20"
+        );
+
+        // ── Which auto-gen questions are actually being used in practice ──
+        // Count appearances of each ai-origin question across adaptive question_ids.
+        $auto_q = $wpdb->get_results(
+            "SELECT q.id, LEFT(q.question_text,70) AS preview, q.status
+             FROM {$QT} q WHERE q.source='ai'
+             ORDER BY q.id DESC LIMIT 200"
+        );
+        // Build usage counts by scanning adaptive rows once.
+        $usage = [];
+        $rows  = $wpdb->get_col("SELECT question_ids FROM {$AD} WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)");
+        foreach ($rows as $csv) {
+            foreach (array_filter(array_map('intval', explode(',', (string)$csv))) as $qid) {
+                $usage[$qid] = ($usage[$qid] ?? 0) + 1;
+            }
+        }
+        // Attach usage to auto questions, keep those used at least once, sort desc.
+        $auto_used = [];
+        foreach ($auto_q as $q) {
+            $u = $usage[(int)$q->id] ?? 0;
+            if ($u > 0) { $q->uses = $u; $auto_used[] = $q; }
+        }
+        usort($auto_used, function($a,$b){ return $b->uses - $a->uses; });
+        $auto_used = array_slice($auto_used, 0, 20);
+
+        $box = 'background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px;margin-bottom:18px';
+        $th  = 'style="text-align:left;padding:7px 10px;background:#f9fafb;font-size:12px;border-bottom:1px solid #e5e7eb"';
+        $td  = 'style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f1f5f9"';
+        ?>
+<div class="wrap">
+  <h1>📊 AI &amp; Practice Activity</h1>
+  <p style="color:#6b7280;max-width:760px">Factual activity from the last 30 days. Counts only — useful for spotting thin question banks and engagement, not for judging individual students.</p>
+
+  <div style="<?php echo $box; ?>">
+    <h2 style="margin-top:0;font-size:15px">🤖 Auto-generated questions per student (who triggered generation)</h2>
+    <table style="width:100%;border-collapse:collapse">
+      <tr><th <?php echo $th;?>>Student</th><th <?php echo $th;?>>Total</th><th <?php echo $th;?>>⚡ Live</th><th <?php echo $th;?>>✅ Approved</th><th <?php echo $th;?>>❌ Rejected</th></tr>
+      <?php if ($gen_per_student): foreach ($gen_per_student as $r): ?>
+      <tr>
+        <td <?php echo $td;?>><?php echo esc_html($r->display_name ?: ('User #'.$r->user_id)); ?><div style="font-size:11px;color:#9ca3af"><?php echo esc_html($r->user_email); ?></div></td>
+        <td <?php echo $td;?>><?php echo intval($r->total); ?></td>
+        <td <?php echo $td;?>><?php echo intval($r->live); ?></td>
+        <td <?php echo $td;?>><?php echo intval($r->approved); ?></td>
+        <td <?php echo $td;?>><?php echo intval($r->rejected); ?></td>
+      </tr>
+      <?php endforeach; else: ?>
+      <tr><td <?php echo $td;?> colspan="5" style="color:#9ca3af;padding:16px">No student-triggered generation yet.</td></tr>
+      <?php endif; ?>
+    </table>
+  </div>
+
+  <div style="<?php echo $box; ?>">
+    <h2 style="margin-top:0;font-size:15px">📝 Practice sessions per student (last 30 days)</h2>
+    <table style="width:100%;border-collapse:collapse">
+      <tr><th <?php echo $th;?>>Student</th><th <?php echo $th;?>>Sessions</th><th <?php echo $th;?>>Last active</th></tr>
+      <?php if ($practice_per_student): foreach ($practice_per_student as $r): ?>
+      <tr>
+        <td <?php echo $td;?>><?php echo esc_html($r->display_name ?: ('User #'.$r->user_id)); ?><div style="font-size:11px;color:#9ca3af"><?php echo esc_html($r->user_email); ?></div></td>
+        <td <?php echo $td;?>><?php echo intval($r->sessions); ?></td>
+        <td <?php echo $td;?>><?php echo esc_html($r->last_active); ?></td>
+      </tr>
+      <?php endforeach; else: ?>
+      <tr><td <?php echo $td;?> colspan="3" style="color:#9ca3af;padding:16px">No practice sessions in the last 30 days.</td></tr>
+      <?php endif; ?>
+    </table>
+  </div>
+
+  <div style="display:flex;gap:18px;flex-wrap:wrap">
+    <div style="<?php echo $box; ?>;flex:1;min-width:320px">
+      <h2 style="margin-top:0;font-size:15px">🔥 Most-practiced topics (30 days)</h2>
+      <table style="width:100%;border-collapse:collapse">
+        <tr><th <?php echo $th;?>>Subject / Topic</th><th <?php echo $th;?>>Sessions</th></tr>
+        <?php if ($top_topics): foreach ($top_topics as $r): ?>
+        <tr>
+          <td <?php echo $td;?>><?php echo esc_html(($r->subject ?: '—').' › '.($r->topic ?: 'All topics')); ?></td>
+          <td <?php echo $td;?>><?php echo intval($r->sessions); ?></td>
+        </tr>
+        <?php endforeach; else: ?>
+        <tr><td <?php echo $td;?> colspan="2" style="color:#9ca3af;padding:16px">No data.</td></tr>
+        <?php endif; ?>
+      </table>
+    </div>
+
+    <div style="<?php echo $box; ?>;flex:1;min-width:320px">
+      <h2 style="margin-top:0;font-size:15px">📈 Auto-gen questions actually used (30 days)</h2>
+      <table style="width:100%;border-collapse:collapse">
+        <tr><th <?php echo $th;?>>Question</th><th <?php echo $th;?>>Uses</th><th <?php echo $th;?>>Status</th></tr>
+        <?php if ($auto_used): foreach ($auto_used as $q): ?>
+        <tr>
+          <td <?php echo $td;?>><?php echo esc_html($q->preview); ?>…</td>
+          <td <?php echo $td;?>><?php echo intval($q->uses); ?></td>
+          <td <?php echo $td;?>><?php echo esc_html($q->status); ?></td>
+        </tr>
+        <?php endforeach; else: ?>
+        <tr><td <?php echo $td;?> colspan="3" style="color:#9ca3af;padding:16px">No auto-generated questions used yet.</td></tr>
+        <?php endif; ?>
+      </table>
+    </div>
+  </div>
+</div>
+        <?php
+    }
+
     /* ── AI Usage Dashboard ── */
     public function page_ai_usage() {
         $stats = CIAS_AI_Bot::get_admin_usage_stats();
@@ -3794,3 +3946,4 @@ _CIAS - www.digitalsumedh.online_</div>
 }
 
 CIAS_Test_Engine::get_instance();
+
