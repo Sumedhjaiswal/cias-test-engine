@@ -8,7 +8,7 @@ class CIAS_Ajax {
             'cias_get_tests','cias_start_test','cias_save_answer',
             'cias_submit_test','cias_get_results','cias_get_history',
             'cias_get_practice','cias_start_adaptive','cias_get_due_revisions',
-            'cias_practice_options',
+            'cias_practice_options','cias_get_notices',
             'cias_get_leaderboard','cias_get_teacher_dashboard',
             'cias_get_student_detail','cias_get_offline_history',
             'cias_verify_pin','cias_session_heartbeat','cias_ai_overview',
@@ -617,6 +617,20 @@ class CIAS_Ajax {
     }
 
     /* ── Start adaptive/practice/drill/revision test ── */
+    public function cias_get_notices() {
+        $this->check();
+        $uid     = get_current_user_id();
+        $notices = get_user_meta($uid, 'cias_gen_notices', true);
+        if (!is_array($notices)) $notices = [];
+
+        // Fetch-and-clear: once delivered to the app, remove so they show once.
+        if (!empty($notices)) {
+            delete_user_meta($uid, 'cias_gen_notices');
+        }
+
+        wp_send_json_success(['notices' => array_values($notices)]);
+    }
+
     public function cias_start_adaptive() {
         $this->check();
         $uid         = get_current_user_id();
