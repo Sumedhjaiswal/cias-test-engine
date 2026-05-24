@@ -1371,6 +1371,29 @@ function toggleTagStyle(cb) {
             // Count AI questions awaiting review (for the banner)
             $pending_ai = intval($wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}cias_questions WHERE status='ai_pending_review'"));
             $type_labels = ['standard'=>'📝 Standard','statement'=>'📋 Statement','match'=>'🔀 Match','assertion'=>'⚖️ Assertion'];
+
+            // Topics & subtopics that ALREADY HAVE at least one question — the only
+            // ones eligible for AI generation (Rule: generate only for topics in use).
+            $gen_tree = $wpdb->get_results(
+                "SELECT q.subject_id, q.topic_id, q.subtopic_id,
+                        t.name AS topic_name, st.name AS subtopic_name,
+                        COUNT(*) AS q_count
+                 FROM {$wpdb->prefix}cias_questions q
+                 LEFT JOIN {$wpdb->prefix}cias_topics t      ON q.topic_id=t.id
+                 LEFT JOIN {$wpdb->prefix}cias_subtopics st  ON q.subtopic_id=st.id
+                 WHERE q.topic_id > 0
+                 GROUP BY q.subject_id, q.topic_id, q.subtopic_id
+                 ORDER BY q.subject_id, t.name, st.name"
+            );
+            // Shape into JS-friendly nested structure: { subjectId: { topicId: {name, subs:[{id,name}]} } }
+            $gen_map = [];
+            foreach ($gen_tree as $row) {
+                $sid = (int)$row->subject_id; $tid = (int)$row->topic_id; $stid = (int)$row->subtopic_id;
+                if (!$tid) continue;
+                if (!isset($gen_map[$sid])) $gen_map[$sid] = [];
+                if (!isset($gen_map[$sid][$tid])) $gen_map[$sid][$tid] = ['name'=>$row->topic_name ?: ('Topic #'.$tid), 'subs'=>[]];
+                if ($stid) $gen_map[$sid][$tid]['subs'][] = ['id'=>$stid, 'name'=>$row->subtopic_name ?: ('Subtopic #'.$stid)];
+            }
         ?>
 <div class="wrap">
 <h1 style="display:flex;align-items:center;gap:10px">
@@ -1396,14 +1419,22 @@ function toggleTagStyle(cb) {
     <?php wp_nonce_field('cias_gen_q'); ?>
     <div>
       <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">Subject</label>
-      <select name="gen_subject_id" required style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
+      <select id="gen_subject" name="gen_subject_id" required style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
         <option value="0">Select…</option>
         <?php foreach($subjects as $s): ?><option value="<?php echo $s->id; ?>"><?php echo esc_html($s->name); ?></option><?php endforeach; ?>
       </select>
     </div>
     <div>
-      <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">Topic ID (optional)</label>
-      <input type="number" name="gen_topic_id" value="0" min="0" style="width:120px;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
+      <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">Topic</label>
+      <select id="gen_topic" name="gen_topic_id" required style="min-width:160px;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
+        <option value="0">Select subject first…</option>
+      </select>
+    </div>
+    <div>
+      <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">Subtopic <span style="color:#9ca3af;font-weight:400">(optional)</span></label>
+      <select id="gen_subtopic" name="gen_subtopic_id" style="min-width:160px;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
+        <option value="0">All subtopics</option>
+      </select>
     </div>
     <div>
       <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">How many</label>
@@ -1412,8 +1443,32 @@ function toggleTagStyle(cb) {
       </select>
     </div>
     <button type="submit" name="cias_gen_questions" value="1" class="button button-primary">Queue generation →</button>
-    <p style="width:100%;margin:8px 0 0;font-size:12px;color:#9ca3af">Questions are generated in the background and land here as <strong>pending review</strong>. They stay hidden from students until you approve them.</p>
+    <p style="width:100%;margin:8px 0 0;font-size:12px;color:#9ca3af">Only topics that already have questions are listed. Generated questions land here as <strong>pending review</strong> and stay hidden from students until you approve them.</p>
   </form>
+  <script>
+  (function(){
+    var TREE = <?php echo wp_json_encode($gen_map); ?> || {};
+    var subS = document.getElementById('gen_subject');
+    var topS = document.getElementById('gen_topic');
+    var subtS = document.getElementById('gen_subtopic');
+    if (!subS) return;
+    function opt(v,t){ var o=document.createElement('option'); o.value=v; o.textContent=t; return o; }
+    subS.addEventListener('change', function(){
+      topS.innerHTML=''; subtS.innerHTML='';
+      var topics = TREE[this.value];
+      if (!topics || !Object.keys(topics).length){ topS.appendChild(opt(0,'No topics with questions')); subtS.appendChild(opt(0,'All subtopics')); return; }
+      topS.appendChild(opt(0,'Select topic…'));
+      Object.keys(topics).forEach(function(tid){ topS.appendChild(opt(tid, topics[tid].name)); });
+      subtS.appendChild(opt(0,'All subtopics'));
+    });
+    topS.addEventListener('change', function(){
+      subtS.innerHTML=''; subtS.appendChild(opt(0,'All subtopics'));
+      var topics = TREE[subS.value]; if(!topics) return;
+      var t = topics[this.value]; if(!t || !t.subs) return;
+      t.subs.forEach(function(s){ subtS.appendChild(opt(s.id, s.name)); });
+    });
+  })();
+  </script>
 </details>
 
 <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
