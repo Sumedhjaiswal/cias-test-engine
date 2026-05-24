@@ -47,6 +47,11 @@ class CIAS_Question_Generator {
         $subtopic_id = (int) ( $payload['subtopic_id']  ?? 0 );
         $count       = (int) ( $payload['count']        ?? 0 );
 
+        // Student-triggered auto top-up uses 'ai_auto' (live immediately, reviewed
+        // retroactively). Teacher-triggered uses 'ai_pending_review' (hidden until
+        // approved). Whitelist to prevent arbitrary status injection.
+        $gen_status  = ( ( $payload['status'] ?? '' ) === 'ai_auto' ) ? 'ai_auto' : 'ai_pending_review';
+
         if ( $subject_id <= 0 || $count <= 0 ) {
             return [ 'generated' => 0, 'reason' => 'Missing subject_id or count.' ];
         }
@@ -144,7 +149,7 @@ class CIAS_Question_Generator {
                 'difficulty'     => $clean['difficulty'],
                 'source'         => 'ai',
                 'created_by'     => 0,
-                'status'         => 'ai_pending_review',
+                'status'         => $gen_status,
                 'created_at'     => current_time( 'mysql' ),
             ];
 
