@@ -988,6 +988,30 @@ class CIAS_Test_Engine {
             echo '<div class="notice notice-success"><p>Question rejected (hidden from practice).</p></div>';
         }
 
+        // ── Bulk actions: approve / reject / delete selected ──
+        if (isset($_POST['cias_bulk_action']) && current_user_can('manage_options')
+            && check_admin_referer('cias_q_bulk')) {
+            $ids = array_filter(array_map('intval', (array)($_POST['q_ids'] ?? [])));
+            $act = sanitize_text_field($_POST['cias_bulk_action']);
+            if (!empty($ids)) {
+                $in = implode(',', $ids);
+                $qt = $wpdb->prefix.'cias_questions';
+                if ($act === 'approve') {
+                    $n = $wpdb->query("UPDATE $qt SET status='published' WHERE id IN ($in)");
+                    echo '<div class="notice notice-success"><p>✅ '.intval($n).' question(s) approved and published.</p></div>';
+                } elseif ($act === 'reject') {
+                    $n = $wpdb->query("UPDATE $qt SET status='rejected' WHERE id IN ($in)");
+                    echo '<div class="notice notice-success"><p>'.intval($n).' question(s) rejected (hidden from practice).</p></div>';
+                } elseif ($act === 'delete') {
+                    $n = $wpdb->query("DELETE FROM $qt WHERE id IN ($in)");
+                    echo '<div class="notice notice-success"><p>🗑️ '.intval($n).' question(s) deleted.</p></div>';
+                }
+                wp_cache_flush();
+            } else {
+                echo '<div class="notice notice-warning"><p>No questions selected.</p></div>';
+            }
+        }
+
         // ── Manual AI generation trigger (queues an async job) ──
         if (isset($_POST['cias_gen_questions']) && current_user_can('manage_options')
             && check_admin_referer('cias_gen_q')) {
@@ -1489,10 +1513,43 @@ function toggleTagStyle(cb) {
   </select>
 </div>
 
+<form method="post" id="cias-q-bulk-form">
+<?php wp_nonce_field('cias_q_bulk'); ?>
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+  <select name="cias_bulk_action" required style="padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">
+    <option value="">Bulk actions…</option>
+    <option value="approve">✅ Approve selected</option>
+    <option value="reject">🚫 Reject selected</option>
+    <option value="delete">🗑️ Delete selected</option>
+  </select>
+  <button type="submit" class="button" onclick="return ciasBulkConfirm()">Apply</button>
+  <span id="cias-sel-count" style="font-size:12px;color:#6b7280"></span>
+</div>
+<script>
+function ciasBulkConfirm(){
+  var f=document.getElementById('cias-q-bulk-form');
+  var act=f.querySelector('[name=cias_bulk_action]').value;
+  var n=f.querySelectorAll('input[name="q_ids[]"]:checked').length;
+  if(!act){alert('Pick a bulk action first.');return false;}
+  if(!n){alert('Select at least one question.');return false;}
+  if(act==='delete')return confirm('Delete '+n+' selected question(s)? This cannot be undone.');
+  if(act==='reject')return confirm('Reject '+n+' selected question(s)? They will be hidden from practice.');
+  return confirm((act==='approve'?'Approve & publish ':'Apply to ')+n+' selected question(s)?');
+}
+function ciasToggleAll(src){
+  document.querySelectorAll('input[name="q_ids[]"]').forEach(function(c){c.checked=src.checked;});
+  ciasUpdateCount();
+}
+function ciasUpdateCount(){
+  var n=document.querySelectorAll('input[name="q_ids[]"]:checked').length;
+  document.getElementById('cias-sel-count').textContent = n? (n+' selected'):'';
+}
+</script>
 <table class="wp-list-table widefat fixed striped" style="border-radius:10px;overflow:hidden">
   <thead style="background:#f9fafb">
     <tr>
-      <th style="width:42%">Question</th>
+      <th style="width:34px"><input type="checkbox" onclick="ciasToggleAll(this)" title="Select all"></th>
+      <th style="width:40%">Question</th>
       <th style="width:12%">Type</th>
       <th style="width:14%">Subject / Topic</th>
       <th style="width:10%">Difficulty</th>
@@ -1508,6 +1565,7 @@ function toggleTagStyle(cb) {
     $stmts = $q->statements ? json_decode($q->statements, true) : [];
   ?>
   <tr>
+    <td><input type="checkbox" name="q_ids[]" value="<?php echo intval($q->id); ?>" onclick="ciasUpdateCount()"></td>
     <td>
       <div style="font-size:13px;font-weight:500;line-height:1.4;margin-bottom:4px"><?php echo esc_html(mb_substr($q->question_text,0,90)); ?>…</div>
       <?php if (!empty($stmts)): ?>
@@ -1547,10 +1605,11 @@ function toggleTagStyle(cb) {
   </tr>
   <?php endforeach; ?>
   <?php if(empty($questions)): ?>
-  <tr><td colspan="7" style="text-align:center;padding:30px;color:#9ca3af">No questions yet. <a href="?page=cias-questions&action=add">Add your first question →</a></td></tr>
+  <tr><td colspan="8" style="text-align:center;padding:30px;color:#9ca3af">No questions yet. <a href="?page=cias-questions&action=add">Add your first question →</a></td></tr>
   <?php endif; ?>
   </tbody>
-</table></div>
+</table>
+</form></div>
         <?php endif;
     }
 
