@@ -83,7 +83,7 @@ class CIAS_Adaptive {
             $pct   = $mix[$diff];
             $count = max(1, (int)round($q_count * $pct / 100));
             $rows  = $wpdb->get_results($wpdb->prepare(
-                "SELECT q.id, q.question_text, q.option_a, q.option_b, q.option_c, q.option_d, q.difficulty
+                "SELECT q.id, q.question_text, q.question_type, q.statements, q.option_a, q.option_b, q.option_c, q.option_d, q.difficulty
                  FROM ".CIAS_QUESTIONS." q $where AND q.difficulty=%s $exclude
                  ORDER BY RAND() LIMIT %d",
                 $diff, $count
@@ -96,7 +96,7 @@ class CIAS_Adaptive {
             $got_ids = !empty($questions) ? 'AND q.id NOT IN ('.implode(',',array_column($questions,'id')).')' : '';
             $need    = $q_count - count($questions);
             $fill    = $wpdb->get_results(
-                "SELECT q.id, q.question_text, q.option_a, q.option_b, q.option_c, q.option_d, q.difficulty
+                "SELECT q.id, q.question_text, q.question_type, q.statements, q.option_a, q.option_b, q.option_c, q.option_d, q.difficulty
                  FROM ".CIAS_QUESTIONS." q $where $exclude $got_ids
                  ORDER BY RAND() LIMIT $need"
             );
