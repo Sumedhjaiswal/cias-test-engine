@@ -632,7 +632,29 @@ class CIAS_Ajax {
         $result = CIAS_Adaptive::generate($uid, $subject_id, $q_count, $topic_id, $subtopic_id);
 
         if (empty($result['questions'])) {
-            wp_send_json_error(['message'=>'Not enough questions in the bank for this topic yet. Ask your instructor to add more questions.']);
+            // Middle-path auto top-up: queue a student-triggered generation job.
+            // Questions land as 'ai_auto' (live immediately + retroactive review).
+            // Rate-limited per subject+topic so a rush of students = one job, not many.
+            $lock_key = 'cias_autogen_' . $subject_id . '_' . $topic_id . '_' . $subtopic_id;
+            $queued   = false;
+            if (class_exists('CIAS_DB_Phase_B') && ! get_transient($lock_key)) {
+                set_transient($lock_key, 1, 10 * MINUTE_IN_SECONDS); // one job per scope per 10 min
+                $job_id = CIAS_DB_Phase_B::push_job('generate_questions', [
+                    'subject_id'  => $subject_id,
+                    'topic_id'    => $topic_id,
+                    'subtopic_id' => $subtopic_id,
+                    'count'       => 5,
+                    'status'      => 'ai_auto',
+                ], 2, 0);
+                if ($job_id) {
+                    $queued = true;
+                    do_action('cias_generate_job_pushed', $job_id);
+                }
+            }
+            $msg = $queued
+                ? 'We\'re preparing fresh questions for this topic right now — please try again in a minute. 🤖'
+                : 'Not enough questions in the bank for this topic yet. More are on the way — please check back shortly.';
+            wp_send_json_error(['message' => $msg, 'autogen' => $queued]);
         }
 
         // Create a virtual test + attempt in the DB so answer save/submit works
