@@ -33,7 +33,7 @@ class CIAS_Adaptive {
         $exclude    = !empty($recent_ids) ? 'AND q.id NOT IN (' . implode(',', array_map('intval',$recent_ids)) . ')' : '';
 
         // Base WHERE clause
-        $where  = "WHERE q.status='published' AND q.subject_id=" . intval($subject_id);
+        $where  = "WHERE q.status IN ('published','ai_auto') AND q.subject_id=" . intval($subject_id);
         if ($topic_id)    $where .= " AND q.topic_id="    . intval($topic_id);
         if ($subtopic_id) $where .= " AND q.subtopic_id=" . intval($subtopic_id);
 
@@ -55,20 +55,20 @@ class CIAS_Adaptive {
                         ( q.subtopic_id > 0 AND q.subtopic_id IN (
                             SELECT x.subtopic_id FROM (
                                 SELECT subtopic_id, MIN(created_at) f FROM " . CIAS_QUESTIONS . "
-                                WHERE status='published' AND subject_id=%d AND subtopic_id>0
+                                WHERE status IN ('published','ai_auto') AND subject_id=%d AND subtopic_id>0
                                 GROUP BY subtopic_id
                             ) x WHERE x.f >= %s
                         ) )
                         OR ( q.subtopic_id = 0 AND q.topic_id > 0 AND q.topic_id IN (
                             SELECT y.topic_id FROM (
                                 SELECT topic_id, MIN(created_at) f FROM " . CIAS_QUESTIONS . "
-                                WHERE status='published' AND subject_id=%d AND topic_id>0 AND subtopic_id=0
+                                WHERE status IN ('published','ai_auto') AND subject_id=%d AND topic_id>0 AND subtopic_id=0
                                 GROUP BY topic_id
                             ) y WHERE y.f >= %s
                         ) )
                         OR ( q.subtopic_id = 0 AND q.topic_id = 0 AND (
                             SELECT MIN(created_at) FROM " . CIAS_QUESTIONS . "
-                            WHERE status='published' AND subject_id=%d AND topic_id=0 AND subtopic_id=0
+                            WHERE status IN ('published','ai_auto') AND subject_id=%d AND topic_id=0 AND subtopic_id=0
                         ) >= %s )
                     )",
                     $sid, $enrolled_at, $sid, $enrolled_at, $sid, $enrolled_at
