@@ -163,6 +163,29 @@ class CIAS_Question_Generator {
 
         if ( $inserted > 0 ) {
             wp_cache_flush();
+
+            // If this generation was triggered by a student (ai_auto), leave them
+            // an in-app notice so they know their questions are ready on next open.
+            if ( $gen_trigger_by > 0 && $gen_status === 'ai_auto' ) {
+                $db        = new CIAS_DB();
+                $subject   = $db->get_by_id( 'subjects', $subject_id );
+                $sub_name  = $subject ? $subject->name : 'your topic';
+                $notices   = get_user_meta( $gen_trigger_by, 'cias_gen_notices', true );
+                if ( ! is_array( $notices ) ) $notices = [];
+                $notices[] = [
+                    'subject_id' => $subject_id,
+                    'topic_id'   => $topic_id,
+                    'count'      => $inserted,
+                    'message'    => sprintf(
+                        '%d new %s question%s are ready — start practicing!',
+                        $inserted, $sub_name, $inserted === 1 ? '' : 's'
+                    ),
+                    'created_at' => current_time( 'mysql' ),
+                ];
+                // Keep only the last 5 notices to avoid unbounded growth.
+                if ( count( $notices ) > 5 ) $notices = array_slice( $notices, -5 );
+                update_user_meta( $gen_trigger_by, 'cias_gen_notices', $notices );
+            }
         }
 
         return [
