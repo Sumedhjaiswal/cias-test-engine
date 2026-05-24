@@ -202,11 +202,16 @@ class CIAS_Question_Generator {
 . "   - \"explanation\": 2-4 sentence explanation of why the answer is correct\n"
 . "   - \"difficulty\": one of \"easy\", \"medium\", \"hard\"\n"
 . "   - \"tags\": array of 1-3 short topic tags\n"
-. "3. For \"statement\" type questions, the options must reference the statements "
+. "3. CRITICAL for \"statement\" type: SPLIT the content correctly.\n"
+. "   - \"question_text\" must contain ONLY the lead-in stem and the closing question — NEVER the numbered statements themselves. Example stem: \"Consider the following statements about the Bhakti Movement: Which of the statements given above is/are correct?\"\n"
+. "   - \"statements\" must be the array of the individual statement strings WITHOUT leading numbers. Example: [\"Ramanuja preached Vishishtadvaita...\", \"Kabir rejected both Hindu and Islamic orthodoxy...\", \"Chaitanya Mahaprabhu popularized Krishna worship...\"]\n"
+. "   - Do NOT put \"1.\", \"2.\", \"3.\" inside the statement strings — numbering is added automatically.\n"
+. "   - Do NOT repeat the statements inside question_text.\n"
+. "4. For \"statement\" type questions, the options must reference the statements "
 . "(e.g. \"1 and 2 only\", \"2 and 3 only\", \"1, 2 and 3\", \"None\").\n"
-. "4. Exactly one option must be correct. Make distractors plausible.\n"
-. "5. Be factually rigorous. Do NOT invent fake facts, dates, or articles.\n"
-. "6. Do NOT duplicate any question the user lists as already existing.";
+. "5. Exactly one option must be correct. Make distractors plausible.\n"
+. "6. Be factually rigorous. Do NOT invent fake facts, dates, or articles.\n"
+. "7. Do NOT duplicate any question the user lists as already existing.";
     }
 
     /** User prompt — the concrete generation request. */
@@ -257,11 +262,24 @@ class CIAS_Question_Generator {
         $statements_json = null;
         if ( $type === 'statement' && ! empty( $item['statements'] ) && is_array( $item['statements'] ) ) {
             $stmts = array_values( array_filter( array_map(
-                function ( $s ) { return sanitize_text_field( (string) $s ); },
+                function ( $s ) {
+                    // Strip any leading numbering the model may have added ("1.", "2)", "iii.")
+                    $s = preg_replace( '/^\s*(?:\(?\d+\)?[.)]|\(?[ivx]+\)?[.)])\s*/i', '', (string) $s );
+                    return sanitize_text_field( trim( $s ) );
+                },
                 $item['statements']
             ) ) );
             if ( ! empty( $stmts ) ) {
                 $statements_json = wp_json_encode( $stmts );
+
+                // Safety net: if the model also embedded the numbered statements inside
+                // question_text, strip them so the stem stays clean (no duplication).
+                // Keep only the lead-in sentence and the closing question line.
+                $qt = (string) $qtext;
+                // Remove inline "1. ... 2. ... 3. ..." runs from the stem.
+                $qt = preg_replace( '/\s*\d+\.\s+.+?(?=(?:\s*\d+\.\s)|(?:\s*Which\b)|$)/su', ' ', $qt );
+                $qt = preg_replace( '/\s{2,}/', ' ', trim( $qt ) );
+                if ( $qt !== '' ) $qtext = $qt;
             } else {
                 $type = 'standard';
             }
