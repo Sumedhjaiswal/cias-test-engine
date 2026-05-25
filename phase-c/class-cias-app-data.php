@@ -30,6 +30,8 @@ class CIAS_App_Data {
                 'email'       => $user->user_email,
                 'initials'    => strtoupper( substr( $user->first_name ?: $user->display_name, 0, 1 ) . substr( $user->last_name ?: '', 0, 1 ) ) ?: 'U',
                 'display_name'=> $user->display_name,
+                'batch'       => self::get_student_batch_name( $user_id ),
+                'member_since'=> self::get_member_since( $user_id ),
             ],
             'credits'     => $credits,
             'stats'       => $stats,
@@ -44,6 +46,7 @@ class CIAS_App_Data {
             'due_revisions'      => self::get_due_revisions( $user_id ),
             'study_plan_today'   => self::get_study_plan_today( $user_id ),
             'rank'               => self::get_leaderboard_rank( $user_id ),
+            'notifications'      => self::get_notifications( $user_id ),
             'nonce'       => wp_create_nonce( 'cias_app_nonce' ),
             'rest_nonce'  => wp_create_nonce( 'wp_rest' ),
             'rest_url'    => esc_url_raw( rest_url( 'cias/v1' ) ),
@@ -154,6 +157,97 @@ class CIAS_App_Data {
     }
 
     // ── Streak ────────────────────────────────────────────────────────────────
+
+    /**
+     * Unified notifications feed from REAL events only (no fabricated items):
+     *  - credit grants / purchases (cias_ai_credit_log)
+     *  - test completions (cias_attempts, submitted)
+     *  - auto-generated questions ready (cias_gen_notices user meta)
+     * Returns newest-first, capped.
+     */
+    public static function get_notifications( int $user_id ): array {
+        global $wpdb;
+        $items = [];
+
+        // Credit log events
+        $credits = $wpdb->get_results( $wpdb->prepare(
+            "SELECT credits, action, note, created_at
+             FROM {$wpdb->prefix}cias_ai_credit_log
+             WHERE user_id = %d ORDER BY created_at DESC LIMIT 10",
+            $user_id
+        ) );
+        foreach ( (array) $credits as $r ) {
+            $delta = (int) $r->credits;
+            if ( $delta > 0 ) {
+                $items[] = [
+                    'icon'  => 'coin',
+                    'title' => $delta . ' credits added',
+                    'sub'   => $r->note ?: ucfirst( str_replace( '_', ' ', (string) $r->action ) ),
+                    'time'  => $r->created_at,
+                ];
+            }
+        }
+
+        // Test completions
+        if ( defined('CIAS_ATTEMPTS') ) {
+            $tests = $wpdb->get_results( $wpdb->prepare(
+                "SELECT percentage, submitted_at
+                 FROM " . CIAS_ATTEMPTS . "
+                 WHERE user_id = %d AND status = 'submitted'
+                 ORDER BY submitted_at DESC LIMIT 5",
+                $user_id
+            ) );
+            foreach ( (array) $tests as $r ) {
+                $items[] = [
+                    'icon'  => 'circle-check',
+                    'title' => 'Test completed',
+                    'sub'   => 'You scored ' . round( (float) $r->percentage ) . '%',
+                    'time'  => $r->submitted_at,
+                ];
+            }
+        }
+
+        // Auto-generated questions ready (pending in-app notices)
+        $notices = get_user_meta( $user_id, 'cias_gen_notices', true );
+        if ( is_array( $notices ) ) {
+            foreach ( $notices as $n ) {
+                $items[] = [
+                    'icon'  => 'bolt',
+                    'title' => 'New questions ready',
+                    'sub'   => $n['message'] ?? 'Fresh questions are available.',
+                    'time'  => $n['created_at'] ?? current_time( 'mysql' ),
+                ];
+            }
+        }
+
+        // Sort newest-first, cap at 15
+        usort( $items, function ( $a, $b ) {
+            return strcmp( (string) $b['time'], (string) $a['time'] );
+        } );
+        return array_slice( $items, 0, 15 );
+    }
+
+    public static function get_student_batch_name( int $user_id ): string {
+        global $wpdb;
+        $name = $wpdb->get_var( $wpdb->prepare(
+            "SELECT b.name FROM {$wpdb->prefix}cias_enrollments e
+             JOIN {$wpdb->prefix}cias_batches b ON b.id = e.batch_id
+             WHERE e.user_id = %d AND e.status = 'active'
+             ORDER BY e.enrolled_at ASC LIMIT 1",
+            $user_id
+        ) );
+        return $name ?: '';
+    }
+
+    public static function get_member_since( int $user_id ): string {
+        global $wpdb;
+        $date = $wpdb->get_var( $wpdb->prepare(
+            "SELECT MIN(enrolled_at) FROM {$wpdb->prefix}cias_enrollments
+             WHERE user_id = %d AND status = 'active'",
+            $user_id
+        ) );
+        return $date ? date_i18n( 'M Y', strtotime( $date ) ) : '';
+    }
 
     public static function get_streak( int $user_id ): array {
         global $wpdb;
