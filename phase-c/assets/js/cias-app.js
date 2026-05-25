@@ -1112,6 +1112,41 @@ var CIASApp = (function () {
     setText('prof-name',  D.user.display_name || D.user.name);
     setText('prof-email', D.user.email);
 
+    // Meta line: batch · member since (real data only — omit if absent)
+    var metaEl = el('prof-meta');
+    if (metaEl) {
+      var parts = [];
+      if (D.user.batch)        parts.push('<span><i class="ti ti-users" style="font-size:13px" aria-hidden="true"></i> ' + esc(D.user.batch) + '</span>');
+      if (D.user.member_since) parts.push('<span><i class="ti ti-calendar" style="font-size:13px" aria-hidden="true"></i> Member since ' + esc(D.user.member_since) + '</span>');
+      metaEl.innerHTML = parts.join('<span class="dot">·</span>');
+    }
+
+    // Stat grid — real values, friendly fallbacks
+    var st = D.stats || {};
+    setText('ps-tests',  (st.tests_taken != null ? st.tests_taken : 0));
+    setText('ps-avg',    (st.avg_score ? st.avg_score + '%' : '—'));
+    setText('ps-streak', ((D.streak && D.streak.current) ? D.streak.current : 0));
+    setText('ps-words',  (st.words_mastered != null ? st.words_mastered : 0));
+
+    // Notifications — real merged feed
+    var notifs = D.notifications || [];
+    var nEl = el('prof-notifications');
+    if (nEl) {
+      if (notifs.length) {
+        nEl.innerHTML = notifs.map(function (n) {
+          return '<div class="ca-notif">' +
+            '<div class="ca-notif-ic"><i class="ti ti-' + esc(n.icon || 'bell') + '" aria-hidden="true"></i></div>' +
+            '<div class="ca-notif-tx">' +
+            '<div class="ca-notif-ttl">' + esc(n.title || '') + '</div>' +
+            '<div class="ca-notif-sub">' + esc(n.sub || '') + '</div>' +
+            '<div class="ca-notif-time">' + esc(timeAgo(n.time)) + '</div>' +
+            '</div></div>';
+        }).join('');
+      } else {
+        nEl.innerHTML = '<div class="ca-notif-empty">No notifications yet. Activity and updates will appear here.</div>';
+      }
+    }
+
     var planName = (D.plan && D.plan.name) || 'Free';
     setText('prof-plan-lbl', planName + ' Plan · Active');
     setText('prof-cr',  D.credits.remaining);
@@ -1337,6 +1372,17 @@ var CIASApp = (function () {
   }
   function nowTime() {
     var d = new Date(); return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+  }
+  function timeAgo(ts) {
+    if (!ts) return '';
+    var t = new Date(String(ts).replace(' ', 'T'));
+    if (isNaN(t.getTime())) return '';
+    var s = Math.floor((Date.now() - t.getTime()) / 1000);
+    if (s < 60) return 'just now';
+    var m = Math.floor(s / 60); if (m < 60) return m + ' min ago';
+    var h = Math.floor(m / 60); if (h < 24) return h + 'h ago';
+    var d = Math.floor(h / 24); if (d < 30) return d + 'd ago';
+    return t.toLocaleDateString();
   }
 
   /* ── Public API ──────────────────────────────────────────── */
