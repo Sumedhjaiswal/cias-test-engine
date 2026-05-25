@@ -830,12 +830,14 @@ var CIASApp = (function () {
     closeConfirm();
     if (!examState) return;
 
+    var wasAdaptive = !!examState.isAdaptive;
     var submitBtn = el('exam-submit-hdr');
     if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; }
 
     ajaxPost('cias_submit_test', { attempt_id: examState.attemptId }, function(res) {
       examState = null;
       if (res && res.success) {
+        if (res.data) res.data.was_adaptive = wasAdaptive;
         showResults(res.data);
       } else {
         alert('Error submitting test. Please try again.');
@@ -871,9 +873,11 @@ var CIASApp = (function () {
       '<div class="ca-rs-card ca-rs-blue"><div class="ca-rs-val">' + m + ':' + (s < 10 ? '0' : '') + s + '</div><div class="ca-rs-lbl">Time</div></div>' +
       '<div class="ca-rs-card ' + (passed ? 'ca-rs-green' : 'ca-rs-red') + '"><div class="ca-rs-val">' + (passed ? 'Pass' : 'Fail') + '</div><div class="ca-rs-lbl">Result</div></div>' +
       '</div>' +
-      '<div style="padding:16px 14px;display:flex;gap:10px">' +
-      '<button class="ca-btn-start-test" style="flex:1" onclick="CIASApp.reviewTest(' + (data.attempt_id || 0) + ')">View Answer Key</button>' +
-      '<button class="ca-btn-review-test" style="flex:1" onclick="CIASApp.goTab(\x27tests\x27);CIASApp.loadTests()">Back to Tests</button>' +
+      '<div style="padding:16px 14px;display:flex;flex-direction:column;gap:10px">' +
+      '<button class="ca-btn-start-test" style="width:100%" onclick="CIASApp.reviewTest(' + (data.attempt_id || 0) + ')"><i class="ti ti-list-check" aria-hidden="true" style="vertical-align:-2px;margin-right:6px"></i>Review Answers &amp; Explanations</button>' +
+      (data.was_adaptive
+        ? '<button class="ca-btn-review-test" style="width:100%" onclick="CIASApp.goTab(\x27practice\x27);CIASApp.loadPractice()">Back to Practice</button>'
+        : '<button class="ca-btn-review-test" style="width:100%" onclick="CIASApp.goTab(\x27tests\x27);CIASApp.loadTests()">Back to Tests</button>') +
       '</div>';
 
     // Refresh test list in background
@@ -882,16 +886,20 @@ var CIASApp = (function () {
 
   // ── Review answers ──────────────────────────────────────────
   function reviewTest(attemptId) {
-    if (!attemptId) return;
     goTab('results');
     var wrap = el('results-wrap');
+    if (!attemptId) {
+      if (wrap) wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af">Could not open the answer key for this attempt. Please try again from your history.</div>';
+      return;
+    }
     if (wrap) wrap.innerHTML = '<div style="text-align:center;padding:30px"><div class="ca-typing"><span></span><span></span><span></span></div><p style="color:#9ca3af;font-size:13px;margin-top:10px">Loading answer key...</p></div>';
 
     ajaxPost('cias_get_results', { attempt_id: attemptId }, function(res) {
       if (res && res.success && res.data && res.data.html) {
-        if (wrap) wrap.innerHTML = '<button onclick="CIASApp.goTab(&quot;tests&quot;)" style="margin:12px 14px 0;display:flex;align-items:center;gap:6px;background:none;border:none;color:#6c63ff;font-weight:600;font-size:13px;cursor:pointer">&#8592; Back to Tests</button>' + res.data.html;
+        if (wrap) wrap.innerHTML = '<button onclick="CIASApp.goTab(&quot;home&quot;)" style="margin:12px 14px 0;display:flex;align-items:center;gap:6px;background:none;border:none;color:#6c63ff;font-weight:600;font-size:13px;cursor:pointer">&#8592; Done</button>' + res.data.html;
       } else {
-        if (wrap) wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af">Results not available.</div>';
+        var msg = (res && res.data && res.data.message) ? res.data.message : 'Results not available.';
+        if (wrap) wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af">' + esc(msg) + '</div>';
       }
     });
   }
