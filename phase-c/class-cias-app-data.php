@@ -254,14 +254,7 @@ class CIAS_App_Data {
 
     public static function get_subject_accuracy( int $user_id ): array {
         if ( ! defined('CIAS_TOPIC_PERF') ) {
-            return [
-                ['subject'=>'Polity','accuracy'=>78],
-                ['subject'=>'History','accuracy'=>65],
-                ['subject'=>'Economy','accuracy'=>72],
-                ['subject'=>'Geography','accuracy'=>55],
-                ['subject'=>'Environment','accuracy'=>88],
-                ['subject'=>'Sci & Tech','accuracy'=>60],
-            ];
+            return []; // No performance data source — return nothing rather than fake data.
         }
         global $wpdb;
         return $wpdb->get_results( $wpdb->prepare(
