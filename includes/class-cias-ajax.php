@@ -681,9 +681,23 @@ class CIAS_Ajax {
         // Create a virtual test + attempt in the DB so answer save/submit works
         global $wpdb;
         $subject = $db->get_by_id('subjects', $subject_id);
-        $title   = $type === 'revision' ? 'Revision — '.($subject->name??'')
-                 : ($type === 'drill'   ? 'Drill — '.($subject->name??'')
-                 :                        'Practice — '.($subject->name??''));
+
+        // Build a precise scope label: Subject › Topic › Subtopic (only the
+        // parts that were actually chosen). Drilling a topic/subtopic makes the
+        // history + notifications specific instead of just subject-level.
+        $scope_parts = [ $subject->name ?? '' ];
+        if ( $topic_id ) {
+            $t = $db->get_by_id('topics', $topic_id);
+            if ( $t && ! empty($t->name) ) $scope_parts[] = $t->name;
+        }
+        if ( $subtopic_id ) {
+            $st = $db->get_by_id('subtopics', $subtopic_id);
+            if ( $st && ! empty($st->name) ) $scope_parts[] = $st->name;
+        }
+        $scope = implode(' › ', array_filter($scope_parts));
+
+        $prefix = $type === 'revision' ? 'Revision' : ($type === 'drill' ? 'Drill' : 'Practice');
+        $title  = $prefix . ' — ' . $scope;
 
         $wpdb->insert(CIAS_TESTS, [
             'title'      => $title,
