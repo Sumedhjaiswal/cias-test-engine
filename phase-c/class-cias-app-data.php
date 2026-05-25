@@ -47,6 +47,7 @@ class CIAS_App_Data {
             'study_plan_today'   => self::get_study_plan_today( $user_id ),
             'rank'               => self::get_leaderboard_rank( $user_id ),
             'notifications'      => self::get_notifications( $user_id ),
+            'attempt_history'    => self::get_attempt_history( $user_id ),
             'nonce'       => wp_create_nonce( 'cias_app_nonce' ),
             'rest_nonce'  => wp_create_nonce( 'wp_rest' ),
             'rest_url'    => esc_url_raw( rest_url( 'cias/v1' ) ),
@@ -158,13 +159,21 @@ class CIAS_App_Data {
 
     // ── Streak ────────────────────────────────────────────────────────────────
 
-    /**
-     * Unified notifications feed from REAL events only (no fabricated items):
-     *  - credit grants / purchases (cias_ai_credit_log)
-     *  - test completions (cias_attempts, submitted)
-     *  - auto-generated questions ready (cias_gen_notices user meta)
-     * Returns newest-first, capped.
-     */
+    public static function get_attempt_history( int $user_id ): array {
+        if ( ! defined('CIAS_ATTEMPTS') || ! defined('CIAS_TESTS') ) return [];
+        global $wpdb;
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT a.id AS attempt_id, a.score, a.total, a.percentage,
+                    a.submitted_at, t.title
+             FROM " . CIAS_ATTEMPTS . " a
+             JOIN " . CIAS_TESTS . " t ON t.id = a.test_id
+             WHERE a.user_id = %d AND a.status = 'submitted'
+             ORDER BY a.submitted_at DESC LIMIT 20",
+            $user_id
+        ), ARRAY_A );
+        return $rows ?: [];
+    }
+
     public static function get_notifications( int $user_id ): array {
         global $wpdb;
         $items = [];
@@ -191,17 +200,22 @@ class CIAS_App_Data {
         // Test completions
         if ( defined('CIAS_ATTEMPTS') ) {
             $tests = $wpdb->get_results( $wpdb->prepare(
-                "SELECT percentage, submitted_at
-                 FROM " . CIAS_ATTEMPTS . "
-                 WHERE user_id = %d AND status = 'submitted'
-                 ORDER BY submitted_at DESC LIMIT 5",
+                "SELECT a.percentage, a.submitted_at, a.score, a.total, t.title
+                 FROM " . CIAS_ATTEMPTS . " a
+                 JOIN " . CIAS_TESTS . " t ON t.id = a.test_id
+                 WHERE a.user_id = %d AND a.status = 'submitted'
+                 ORDER BY a.submitted_at DESC LIMIT 6",
                 $user_id
             ) );
             foreach ( (array) $tests as $r ) {
+                // Title already encodes type + subject, e.g. "Practice — Geography",
+                // "Revision — Polity", "Drill — History", or a class test name.
+                $label = $r->title ?: 'Test';
                 $items[] = [
                     'icon'  => 'circle-check',
-                    'title' => 'Test completed',
-                    'sub'   => 'You scored ' . round( (float) $r->percentage ) . '%',
+                    'title' => $label,
+                    'sub'   => 'Scored ' . round( (float) $r->percentage ) . '%  ·  '
+                             . intval($r->score) . '/' . intval($r->total) . ' correct',
                     'time'  => $r->submitted_at,
                 ];
             }
