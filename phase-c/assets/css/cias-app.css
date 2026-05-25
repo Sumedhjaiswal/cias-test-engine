@@ -797,3 +797,12 @@ body.cias-app-page .wp-site-blocks > *:not(:has(.cias-app-shell)) {
 .ca-notif-sub{font-size:12px;color:#6b7280;margin-top:1px}
 .ca-notif-time{font-size:11px;color:#b6b6c2;margin-top:2px}
 .ca-notif-empty{font-size:13px;color:#9ca3af;text-align:center;padding:10px 0}
+
+/* ── Recent practice & tests history (in Practice tab) ── */
+.ca-hist-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.ca-hist-item{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #eceaf3;border-radius:12px;padding:11px 13px}
+.ca-hist-tx{flex:1;min-width:0}
+.ca-hist-ttl{font-size:13px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ca-hist-meta{font-size:11px;color:#9ca3af;margin-top:2px}
+.ca-hist-score{font-size:15px;font-weight:700;flex-shrink:0}
+.ca-hist-rev{flex-shrink:0;font-size:12px;font-weight:600;color:#6c63ff;background:#f3f1ff;border:none;border-radius:8px;padding:7px 12px;cursor:pointer}
