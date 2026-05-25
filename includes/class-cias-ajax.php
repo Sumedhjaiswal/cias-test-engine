@@ -369,7 +369,7 @@ class CIAS_Ajax {
   <div class="cias-result-stats">
     <div class="cias-rs-item cias-rs-green"><div><?php echo $attempt->score; ?></div><small>Correct</small></div>
     <div class="cias-rs-item cias-rs-red"><div><?php echo $attempt->total - $attempt->score; ?></div><small>Wrong</small></div>
-    <div class="cias-rs-item cias-rs-blue"><div><?php echo gmdate('i:s', intval($attempt->time_taken)); ?></div><small>Time Taken</small></div>
+    <div class="cias-rs-item cias-rs-blue"><div><?php $tt=intval($attempt->time_taken); echo $tt>=3600 ? floor($tt/3600).'h '.floor(($tt%3600)/60).'m' : gmdate('i:s',$tt); ?></div><small>Time Taken</small></div>
     <div class="cias-rs-item <?php echo $passed?'cias-rs-green':'cias-rs-red'; ?>"><div><?php echo $passed?'Pass':'Fail'; ?></div><small>Result</small></div>
   </div>
   <div class="cias-answer-key">
