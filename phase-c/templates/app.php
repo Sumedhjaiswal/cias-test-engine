@@ -71,7 +71,7 @@ defined( 'ABSPATH' ) || exit;
           <div class="ca-act-sub">Stats &amp; heatmap</div>
         </button>
 
-        <button class="ca-act-card ca-act-amber" onclick="CIASApp.guruTab ? (CIASApp.goTab('tutor'), CIASApp.guruTab('rank')) : CIASApp.goTab('tutor')" aria-label="Leaderboard">
+        <button class="ca-act-card ca-act-amber" onclick="CIASApp.goTab('progress')" aria-label="Leaderboard">
           <div class="ca-act-top">
             <i class="ti ti-trophy ca-act-icon" aria-hidden="true"></i>
             <span class="ca-act-rank" id="act-rank-lbl">--</span>
@@ -150,7 +150,7 @@ defined( 'ABSPATH' ) || exit;
         </button>
         <div class="ca-home-collapse-body" id="home-heat-body" style="display:none">
           <div id="home-heat-bars"></div>
-          <button class="ca-hc-more" onclick="CIASApp.goTab('tutor'); CIASApp.guruTab && CIASApp.guruTab('heat')">Open full heatmap →</button>
+          <button class="ca-hc-more" onclick="CIASApp.goTab('progress')">Open full heatmap →</button>
         </div>
       </div>
 
@@ -168,7 +168,7 @@ defined( 'ABSPATH' ) || exit;
             <div class="ca-hc-rank-meta"><span id="home-rank-conf">--%</span> confidence · marks /200</div>
           </div>
           <div id="home-rank-factors"></div>
-          <button class="ca-hc-more" onclick="CIASApp.goTab('tutor'); CIASApp.guruTab && CIASApp.guruTab('rank')">See full breakdown →</button>
+          <button class="ca-hc-more" onclick="CIASApp.goTab('progress')">See full breakdown →</button>
         </div>
       </div>
     </section>
@@ -326,29 +326,6 @@ defined( 'ABSPATH' ) || exit;
 
     <!-- AI GURU -->
     <section class="ca-screen ca-guru-screen" id="scr-tutor" aria-label="AI Guru">
-      <!-- Sub-nav tabs -->
-      <nav class="ca-guru-subnav" role="tablist" aria-label="AI Guru sections">
-        <button class="ca-guru-tab active" id="gt-mentor" onclick="CIASApp.guruTab('mentor')" role="tab" aria-selected="true">
-          <span class="ca-gt-icon" aria-hidden="true">🧠</span>
-          <span class="ca-gt-label">AI Mentor</span>
-        </button>
-        <button class="ca-guru-tab" id="gt-plan" onclick="CIASApp.guruTab('plan')" role="tab" aria-selected="false">
-          <span class="ca-gt-icon" aria-hidden="true">📅</span>
-          <span class="ca-gt-label">Study Plan</span>
-        </button>
-        <button class="ca-guru-tab" id="gt-lec" onclick="CIASApp.guruTab('lec')" role="tab" aria-selected="false">
-          <span class="ca-gt-icon" aria-hidden="true">🎬</span>
-          <span class="ca-gt-label">Lectures</span>
-        </button>
-        <button class="ca-guru-tab" id="gt-rank" onclick="CIASApp.guruTab('rank')" role="tab" aria-selected="false">
-          <span class="ca-gt-icon" aria-hidden="true">🏆</span>
-          <span class="ca-gt-label">Rank</span>
-        </button>
-        <button class="ca-guru-tab" id="gt-heat" onclick="CIASApp.guruTab('heat')" role="tab" aria-selected="false">
-          <span class="ca-gt-icon" aria-hidden="true">🔥</span>
-          <span class="ca-gt-label">Heatmap</span>
-        </button>
-      </nav>
 
       <!-- AI Mentor panel -->
       <div class="ca-guru-panel active" id="gp-mentor" role="tabpanel">
@@ -402,85 +379,6 @@ defined( 'ABSPATH' ) || exit;
                style="display:none" aria-hidden="true" onchange="CIASApp.onFile(event)">
       </div>
 
-      <!-- Study Plan panel -->
-      <div class="ca-guru-panel" id="gp-plan" role="tabpanel">
-        <div class="ca-plan-wrap">
-          <div class="ca-plan-motivation" id="plan-motivation">Loading your study plan...</div>
-          <div class="ca-plan-card">
-            <div class="ca-plan-card-title">Today's tasks</div>
-            <div class="ca-plan-task">
-              <div class="ca-task-icon" style="background:#eff6ff"><i class="ti ti-help-circle" style="color:#2563eb" aria-hidden="true"></i></div>
-              <div><div class="ca-task-name">Practice MCQs</div><div class="ca-task-why">Your weakest area</div></div>
-              <span class="ca-task-count">20 Qs</span>
-            </div>
-            <div class="ca-plan-task">
-              <div class="ca-task-icon" style="background:#f0fdf4"><i class="ti ti-abc" style="color:#16a34a" aria-hidden="true"></i></div>
-              <div><div class="ca-task-name">Vocabulary</div><div class="ca-task-why">Builds comprehension</div></div>
-              <span class="ca-task-count" id="plan-vocab-due">-- words</span>
-            </div>
-            <div class="ca-plan-task">
-              <div class="ca-task-icon" style="background:#fff7ed"><i class="ti ti-video" style="color:#ea580c" aria-hidden="true"></i></div>
-              <div><div class="ca-task-name">Watch lecture</div><div class="ca-task-why">Concept clarity</div></div>
-              <span class="ca-task-count">1 video</span>
-            </div>
-            <div class="ca-plan-task">
-              <div class="ca-task-icon" style="background:#f5f3ff"><i class="ti ti-refresh" style="color:#7c3aed" aria-hidden="true"></i></div>
-              <div><div class="ca-task-name">Revision</div><div class="ca-task-why">Spaced repetition</div></div>
-              <span class="ca-task-count">30 min</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Lectures panel -->
-      <div class="ca-guru-panel" id="gp-lec" role="tabpanel">
-        <div class="ca-plan-wrap">
-          <p style="font-size:13px;color:#6b7280;margin-bottom:10px;font-weight:600">Recommended based on your weak topics</p>
-          <div class="ca-lec-card">
-            <div class="ca-lec-header" style="background:#1a1560">
-              <div class="ca-lec-play" style="background:#6c63ff"><i class="ti ti-player-play" style="color:#fff;font-size:20px" aria-hidden="true"></i></div>
-              <div><div class="ca-lec-title">Fundamentals of Polity</div><div class="ca-lec-meta">45 min · Lecture 1</div></div>
-            </div>
-            <div style="padding:12px"><p style="font-size:12px;color:#6b7280;margin-bottom:8px">Your Polity accuracy is low — start from the beginning.</p>
-            <button class="ca-btn-start-test">Watch Now</button></div>
-          </div>
-          <div class="ca-lec-card">
-            <div class="ca-lec-header" style="background:#1a1560">
-              <div class="ca-lec-play" style="background:#e8431a"><i class="ti ti-player-play" style="color:#fff;font-size:20px" aria-hidden="true"></i></div>
-              <div><div class="ca-lec-title">Geography: Monsoon Systems</div><div class="ca-lec-meta">38 min · Lecture 3</div></div>
-            </div>
-            <div style="padding:12px"><p style="font-size:12px;color:#6b7280;margin-bottom:8px">Geography accuracy is critical for Prelims 2026.</p>
-            <button class="ca-btn-start-test">Watch Now</button></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Rank panel -->
-      <div class="ca-guru-panel" id="gp-rank" role="tabpanel">
-        <div class="ca-plan-wrap">
-          <div class="ca-rank-card">
-            <p style="font-size:13px;color:#6b7280;margin-bottom:4px">Prelims score estimate</p>
-            <div class="ca-rank-range" id="rank-range">-- – --</div>
-            <p style="font-size:13px;color:#6b7280;margin-top:4px">marks out of 200</p>
-            <span class="ca-rank-conf" id="rank-conf">--%  confidence</span>
-          </div>
-          <div class="ca-plan-card" id="rank-factors"></div>
-        </div>
-      </div>
-
-      <!-- Heatmap panel -->
-      <div class="ca-guru-panel" id="gp-heat" role="tabpanel">
-        <div class="ca-plan-wrap">
-          <div class="ca-plan-card">
-            <div class="ca-plan-card-title">Subject accuracy matrix</div>
-            <div id="heatmap-bars"></div>
-          </div>
-          <div class="ca-plan-card" id="weak-topics-card">
-            <div class="ca-plan-card-title">Weak topics (below 60%)</div>
-            <div id="weak-topics-list" style="font-size:13px;color:#374151;line-height:2"></div>
-          </div>
-        </div>
-      </div>
     </section>
 
     <!-- PROGRESS -->
@@ -496,6 +394,23 @@ defined( 'ABSPATH' ) || exit;
         <div class="ca-prog-card">
           <div class="ca-prog-title">Subject-wise accuracy</div>
           <div id="subj-accuracy"></div>
+        </div>
+        <div class="ca-prog-card">
+          <div class="ca-prog-title">Prelims score estimate</div>
+          <div class="ca-rank-card" style="text-align:center;padding:6px 0">
+            <div class="ca-rank-range" id="rank-range" style="font-size:30px;font-weight:700;color:#6c63ff">-- – --</div>
+            <p style="font-size:12px;color:#9ca3af;margin-top:2px">marks out of 200</p>
+            <span class="ca-rank-conf" id="rank-conf" style="font-size:12px;color:#9ca3af">--% confidence</span>
+          </div>
+          <div id="rank-factors" style="margin-top:10px"></div>
+        </div>
+        <div class="ca-prog-card">
+          <div class="ca-prog-title">Subject accuracy matrix</div>
+          <div id="heatmap-bars"></div>
+          <div id="weak-topics-card" style="margin-top:12px">
+            <div class="ca-prog-title" style="font-size:13px">Weak topics (below 60%)</div>
+            <div id="weak-topics-list" style="font-size:13px;color:#374151;line-height:2"></div>
+          </div>
         </div>
         <div class="ca-prog-card">
           <div class="ca-prog-title">Activity — last 31 days</div>
