@@ -757,3 +757,25 @@ body.cias-app-page .wp-site-blocks > *:not(:has(.cias-app-shell)) {
 .cias-ak-skipped { background:#f9fafb }
 .cias-ak-header { display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;font-weight:600 }
 .cias-ak-question { font-size:13px;color:#1f2937;margin-bottom:6px }
+
+/* ── Home collapsible cards (Heatmap / Rank) ── */
+.ca-home-collapse{background:#fff;border:1px solid #eceaf3;border-radius:16px;margin:12px 16px 0;overflow:hidden}
+.ca-home-collapse-hdr{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:none;border:none;cursor:pointer;text-align:left}
+.ca-hc-left{display:flex;align-items:center;gap:12px}
+.ca-hc-icon{font-size:20px;color:#6c63ff;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:#f3f1ff;border-radius:10px}
+.ca-hc-title{display:block;font-size:14px;font-weight:600;color:#1f2937}
+.ca-hc-sub{display:block;font-size:12px;color:#9ca3af;margin-top:1px}
+.ca-hc-chev{font-size:18px;color:#9ca3af;transition:transform .2s ease}
+.ca-hc-chev.open{transform:rotate(180deg)}
+.ca-home-collapse-body{padding:4px 16px 16px}
+.ca-hc-more{margin-top:12px;width:100%;padding:9px;font-size:13px;font-weight:600;color:#6c63ff;background:#f3f1ff;border:none;border-radius:10px;cursor:pointer}
+.ca-hc-row{display:flex;align-items:center;gap:8px;margin:7px 0}
+.ca-hc-row-subj{font-size:12px;color:#374151;width:78px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ca-hc-row-wrap{flex:1;height:8px;background:#f1f0f6;border-radius:99px;overflow:hidden}
+.ca-hc-row-bar{height:100%;border-radius:99px}
+.ca-hc-row-pct{font-size:12px;font-weight:600;color:#1f2937;width:34px;text-align:right}
+.ca-hc-rank-row{text-align:center;padding:8px 0 4px}
+.ca-hc-rank-range{font-size:30px;font-weight:700;color:#6c63ff;line-height:1.1}
+.ca-hc-rank-meta{font-size:12px;color:#9ca3af;margin-top:4px}
+.ca-hc-factor{display:flex;align-items:center;gap:7px;font-size:13px;color:#374151;margin-top:9px}
+.ca-hc-empty{font-size:13px;color:#9ca3af;text-align:center;padding:10px 0}
