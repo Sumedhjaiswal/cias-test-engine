@@ -1009,11 +1009,10 @@ var CIASApp = (function () {
   }
 
   function guruTab(t) {
-    ['mentor', 'plan', 'lec', 'rank', 'heat'].forEach(function (p) {
-      toggleClass('gt-' + p, 'active', p === t);
-      toggleClass('gp-' + p, 'active', p === t);
-      attr('gt-' + p, 'aria-selected', p === t ? 'true' : 'false');
-    });
+    // Guru sub-tabs were removed — AI Guru is now chat-only. Analytics (rank,
+    // heatmap) moved to Progress; study plan lives on home. Kept as a safe
+    // no-op so any stale references don't throw.
+    return;
   }
 
 
