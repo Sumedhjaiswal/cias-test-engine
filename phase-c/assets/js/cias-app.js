@@ -913,11 +913,32 @@ var CIASApp = (function () {
     wrap.innerHTML = '<div style="text-align:center;padding:30px"><div class="ca-typing"><span></span><span></span><span></span></div><p style="color:#9ca3af;font-size:13px;margin-top:10px">Loading practice...</p></div>';
     ajaxPost('cias_get_practice', {}, function(res) {
       if (res && res.success && res.data && res.data.html) {
-        wrap.innerHTML = res.data.html;
+        wrap.innerHTML = res.data.html + renderRecentAttempts();
       } else {
         wrap.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af">Could not load practice. Please try again.</div>';
       }
     });
+  }
+
+  // Recent practice & tests history — real attempts, reviewable.
+  function renderRecentAttempts() {
+    var list = D.attempt_history || [];
+    if (!list.length) return '';
+    var rows = list.slice(0, 10).map(function (a) {
+      var pct  = Math.round(a.percentage || 0);
+      var pass = pct >= 60;
+      var color = pass ? '#16a34a' : '#dc2626';
+      return '<div class="ca-hist-item">' +
+        '<div class="ca-hist-tx">' +
+        '<div class="ca-hist-ttl">' + esc(a.title || 'Test') + '</div>' +
+        '<div class="ca-hist-meta">' + esc(timeAgo(a.submitted_at)) + ' · ' + (a.score||0) + '/' + (a.total||0) + '</div>' +
+        '</div>' +
+        '<span class="ca-hist-score" style="color:' + color + '">' + pct + '%</span>' +
+        '<button class="ca-hist-rev" onclick="CIASApp.reviewTest(' + (a.attempt_id||0) + ')">Review</button>' +
+        '</div>';
+    }).join('');
+    return '<div class="cias-section-label" style="margin-top:22px">Your recent practice &amp; tests</div>' +
+           '<div class="ca-hist-list">' + rows + '</div>';
   }
 
   function loadPracticeSubject(subjectId) {
