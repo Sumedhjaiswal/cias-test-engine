@@ -723,7 +723,7 @@ var CIASApp = (function () {
         'onclick="CIASApp.selectOpt(this,\'' + letter + '\',' + q.id + ')" ' +
         'data-letter="' + letter + '">' +
         '<span class="ca-exam-opt-letter">' + letter.toUpperCase() + '</span>' +
-        '<span>' + esc(optTxts[i] || '') + '</span>' +
+        '<span class="ca-exam-opt-txt">' + esc(optTxts[i] || '') + '</span>' +
         '</button>';
     }).join('');
 
@@ -855,6 +855,7 @@ var CIASApp = (function () {
     var timeTaken = data.time_taken || 0;
     var m       = Math.floor(timeTaken / 60);
     var s       = timeTaken % 60;
+    var timeDisp = fmtDuration(timeTaken);
 
     goTab('results');
     var wrap = el('results-wrap');
@@ -870,7 +871,7 @@ var CIASApp = (function () {
       '<div class="ca-results-stats">' +
       '<div class="ca-rs-card ca-rs-green"><div class="ca-rs-val">' + score + '</div><div class="ca-rs-lbl">Correct</div></div>' +
       '<div class="ca-rs-card ca-rs-red"><div class="ca-rs-val">' + (total - score) + '</div><div class="ca-rs-lbl">Wrong</div></div>' +
-      '<div class="ca-rs-card ca-rs-blue"><div class="ca-rs-val">' + m + ':' + (s < 10 ? '0' : '') + s + '</div><div class="ca-rs-lbl">Time</div></div>' +
+      '<div class="ca-rs-card ca-rs-blue"><div class="ca-rs-val">' + timeDisp + '</div><div class="ca-rs-lbl">Time</div></div>' +
       '<div class="ca-rs-card ' + (passed ? 'ca-rs-green' : 'ca-rs-red') + '"><div class="ca-rs-val">' + (passed ? 'Pass' : 'Fail') + '</div><div class="ca-rs-lbl">Result</div></div>' +
       '</div>' +
       '<div style="padding:16px 14px;display:flex;flex-direction:column;gap:10px">' +
@@ -1380,6 +1381,15 @@ var CIASApp = (function () {
   }
   function nowTime() {
     var d = new Date(); return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+  }
+  function fmtDuration(secs) {
+    secs = parseInt(secs, 10) || 0;
+    if (secs < 60) return secs + 's';
+    var h = Math.floor(secs / 3600);
+    var m = Math.floor((secs % 3600) / 60);
+    var s = secs % 60;
+    if (h > 0) return h + 'h ' + m + 'm';
+    return m + ':' + (s < 10 ? '0' : '') + s;
   }
   function timeAgo(ts) {
     if (!ts) return '';
