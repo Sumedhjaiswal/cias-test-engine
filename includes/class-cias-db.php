@@ -1043,6 +1043,10 @@ class CIAS_DB {
         // when an in-progress attempt was left open across sessions)
         $tl = intval($wpdb->get_var($wpdb->prepare("SELECT time_limit FROM ".CIAS_TESTS." WHERE id=%d",$attempt->test_id)));
         if ($tl > 0 && $time_taken > $tl * 60) $time_taken = $tl * 60;
+        // Untimed practice (time_limit = 0): wall-clock can be huge if the
+        // attempt was left open. Cap at a sane 2-hour ceiling so the displayed
+        // "time taken" stays meaningful rather than showing hundreds of minutes.
+        if ($tl === 0 && $time_taken > 7200) $time_taken = 7200;
         if ($time_taken < 0) $time_taken = 0;
 
         $wpdb->update(CIAS_ATTEMPTS,[
