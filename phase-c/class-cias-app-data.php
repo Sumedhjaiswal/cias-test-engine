@@ -253,20 +253,31 @@ class CIAS_App_Data {
     // ── Subject accuracy (from topic performance table) ───────────────────────
 
     public static function get_subject_accuracy( int $user_id ): array {
-        if ( ! defined('CIAS_TOPIC_PERF') ) {
-            return []; // No performance data source — return nothing rather than fake data.
-        }
         global $wpdb;
-        return $wpdb->get_results( $wpdb->prepare(
-            "SELECT tp.subject_id, COALESCE(s.name,'Subject') AS subject,
-                    ROUND(AVG(tp.avg_score)) AS accuracy
-             FROM " . CIAS_TOPIC_PERF . " tp
-             LEFT JOIN {$wpdb->prefix}cias_subjects s ON s.id = tp.subject_id
-             WHERE tp.user_id = %d
-             GROUP BY tp.subject_id
+        $att = $wpdb->prefix . 'cias_attempts';
+        $ans = $wpdb->prefix . 'cias_answers';
+        $qs  = $wpdb->prefix . 'cias_questions';
+        $sub = $wpdb->prefix . 'cias_subjects';
+
+        // Real subject accuracy from actual MCQ practice/test answers.
+        // accuracy = correct answers / total answered, per subject, for this student.
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT q.subject_id,
+                    COALESCE(s.name,'Subject') AS subject,
+                    ROUND( SUM(a.is_correct) / NULLIF(COUNT(a.id),0) * 100 ) AS accuracy,
+                    COUNT(a.id) AS answered
+             FROM {$ans} a
+             JOIN {$att} t ON t.id = a.attempt_id AND t.user_id = %d AND t.status = 'submitted'
+             JOIN {$qs}  q ON q.id = a.question_id
+             LEFT JOIN {$sub} s ON s.id = q.subject_id
+             WHERE q.subject_id > 0
+             GROUP BY q.subject_id
+             HAVING answered > 0
              ORDER BY accuracy DESC",
             $user_id
-        ), ARRAY_A ) ?: [];
+        ), ARRAY_A );
+
+        return $rows ?: [];
     }
 
     // ── Writing scores ────────────────────────────────────────────────────────
