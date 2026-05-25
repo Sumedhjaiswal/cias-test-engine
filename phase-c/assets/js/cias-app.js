@@ -83,6 +83,7 @@ var CIASApp = (function () {
     populateGuruStats();
     populateHeatmap();
     populateRank();
+    populateHomeCards();
     renderInitialChat();
 
     goTab('home');
@@ -1038,11 +1039,7 @@ var CIASApp = (function () {
 
     // Subject accuracy bars
     var colors = ['#3b82f6','#8b5cf6','#22c55e','#f97316','#06b6d4','#ec4899'];
-    var subjs = D.subject_accuracy && D.subject_accuracy.length ? D.subject_accuracy : [
-      {subject:'Polity',accuracy:78},{subject:'History',accuracy:65},
-      {subject:'Economy',accuracy:72},{subject:'Geography',accuracy:55},
-      {subject:'Environment',accuracy:88},{subject:'Sci & Tech',accuracy:60}
-    ];
+    var subjs = (D.subject_accuracy && D.subject_accuracy.length) ? D.subject_accuracy : [];
     var saEl = el('subj-accuracy');
     if (saEl) {
       saEl.innerHTML = subjs.map(function (s, i) {
@@ -1186,21 +1183,84 @@ var CIASApp = (function () {
   }
 
   /* ── Heatmap & Rank ──────────────────────────────────────── */
+  // ── Home collapsible cards: REAL DATA ONLY (no fake fallback) ──────────────
+  var COLORS = ['#3b82f6','#8b5cf6','#22c55e','#f97316','#06b6d4','#ec4899'];
+
+  function populateHomeCards() {
+    var subjs = (D.subject_accuracy && D.subject_accuracy.length) ? D.subject_accuracy : [];
+
+    // Heatmap card — only show if we have real subject-accuracy data.
+    var heatCard = el('home-heat-card');
+    if (heatCard) {
+      if (subjs.length) {
+        heatCard.style.display = 'block';
+        var sub = el('home-heat-sub');
+        if (sub) sub.textContent = subjs.length + ' subject' + (subjs.length === 1 ? '' : 's') + ' tracked';
+        var bars = el('home-heat-bars');
+        if (bars) {
+          bars.innerHTML = subjs.map(function (s, i) {
+            var acc = Math.round(s.accuracy || 0);
+            return '<div class="ca-hc-row">' +
+              '<span class="ca-hc-row-subj">' + esc(s.subject || s.subject_id || '') + '</span>' +
+              '<div class="ca-hc-row-wrap"><div class="ca-hc-row-bar" style="width:' + acc + '%;background:' + COLORS[i % COLORS.length] + '"></div></div>' +
+              '<span class="ca-hc-row-pct">' + acc + '%</span></div>';
+          }).join('');
+        }
+      } else {
+        heatCard.style.display = 'none'; // no real data → hide, don't fake it
+      }
+    }
+
+    // Rank/estimate card — needs real avg_score AND at least some accuracy data.
+    var rankCard = el('home-rank-card');
+    var avg = (D.stats && typeof D.stats.avg_score === 'number') ? D.stats.avg_score : null;
+    if (rankCard) {
+      if (avg !== null && avg > 0 && subjs.length) {
+        rankCard.style.display = 'block';
+        var low  = Math.max(50, Math.round(avg * 0.9));
+        var high = Math.min(200, Math.round(avg * 1.15));
+        setText('home-rank-range', low + ' – ' + high);
+        var conf = Math.min(90, Math.round(avg * 0.8 + 20));
+        setText('home-rank-conf', conf + '%');
+        var strong = subjs.filter(function (s) { return (s.accuracy || 0) >= 75; }).slice(0, 2);
+        var weak   = subjs.filter(function (s) { return (s.accuracy || 0) < 60; }).slice(0, 2);
+        var fx = el('home-rank-factors');
+        if (fx) {
+          var html = strong.map(function (s) {
+            return '<div class="ca-hc-factor"><i class="ti ti-circle-check" style="color:#22c55e;font-size:15px" aria-hidden="true"></i> Strong ' + esc(s.subject || '') + ' (' + Math.round(s.accuracy) + '%)</div>';
+          }).join('') + weak.map(function (s) {
+            return '<div class="ca-hc-factor"><i class="ti ti-alert-circle" style="color:#f97316;font-size:15px" aria-hidden="true"></i> ' + esc(s.subject || '') + ' needs work (' + Math.round(s.accuracy) + '%)</div>';
+          }).join('');
+          fx.innerHTML = html || '<div class="ca-hc-empty">Keep practising to refine this estimate.</div>';
+        }
+      } else {
+        rankCard.style.display = 'none'; // not enough real data → hide
+      }
+    }
+  }
+
+  function toggleHomeCard(which) {
+    var body = el('home-' + which + '-body');
+    var chev = el('home-' + which + '-chev');
+    var hdr  = body && body.previousElementSibling;
+    if (!body) return;
+    var open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    if (chev) chev.classList.toggle('open', !open);
+    if (hdr && hdr.setAttribute) hdr.setAttribute('aria-expanded', open ? 'false' : 'true');
+  }
+
   function populateHeatmap() {
     var colors = ['#3b82f6','#8b5cf6','#22c55e','#f97316','#06b6d4','#ec4899'];
-    var subjs = D.subject_accuracy && D.subject_accuracy.length ? D.subject_accuracy : [
-      {subject:'Polity',accuracy:78},{subject:'History',accuracy:65},
-      {subject:'Economy',accuracy:72},{subject:'Geography',accuracy:55},
-      {subject:'Environment',accuracy:88},{subject:'Sci & Tech',accuracy:60}
-    ];
+    var subjs = (D.subject_accuracy && D.subject_accuracy.length) ? D.subject_accuracy : [];
     var hb = el('heatmap-bars');
     if (hb) {
-      hb.innerHTML = subjs.map(function (s, i) {
+      hb.innerHTML = subjs.length ? subjs.map(function (s, i) {
         return '<div class="ca-hmap-row">' +
           '<span class="ca-hmap-subj">' + esc(s.subject || s.subject_id || '') + '</span>' +
           '<div class="ca-hmap-bar-wrap"><div class="ca-hmap-bar" style="background:' + colors[i % colors.length] + ';width:' + (s.accuracy || 0) + '%"></div></div>' +
           '<span class="ca-hmap-pct">' + Math.round(s.accuracy || 0) + '%</span></div>';
-      }).join('');
+      }).join('') : '<div class="ca-hc-empty">No subject data yet — take a few tests to see your accuracy here.</div>';
     }
     var weak = subjs.filter(function (s) { return (s.accuracy || 0) < 60; });
     var wl = el('weak-topics-list');
@@ -1212,7 +1272,14 @@ var CIASApp = (function () {
   }
 
   function populateRank() {
-    var avg = D.stats.avg_score || 68;
+    var avg = (D.stats && typeof D.stats.avg_score === 'number') ? D.stats.avg_score : 0;
+    if (!avg || avg <= 0) {
+      setText('rank-range', '— – —');
+      setText('rank-conf', 'Take a test to estimate');
+      var rf0 = el('rank-factors');
+      if (rf0) rf0.innerHTML = '<div class="ca-hc-empty">No score data yet. Complete a test to see your prelims estimate.</div>';
+      return;
+    }
     var low = Math.max(50, Math.round(avg * 0.9));
     var high = Math.min(200, Math.round(avg * 1.15));
     setText('rank-range', low + ' – ' + high);
@@ -1303,6 +1370,7 @@ var CIASApp = (function () {
     loadPracticeSubject: loadPracticeSubject,
     loadPracticeTopic: loadPracticeTopic,
     startAdaptive: startAdaptive,
+    toggleHomeCard: toggleHomeCard,
     endSession:    endSession,
     flipCard:      flipCard,
     nextCard:      nextCard,
