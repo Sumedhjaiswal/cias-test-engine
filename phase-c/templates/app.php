@@ -139,6 +139,38 @@ defined( 'ABSPATH' ) || exit;
         <div class="ca-plan-today-quote" id="plan-today-quote">Loading your personalised plan...</div>
         <div id="plan-today-tasks"></div>
       </div>
+
+      <!-- Collapsible: Subject accuracy (heatmap) — real data only -->
+      <div class="ca-home-collapse" id="home-heat-card" style="display:none">
+        <button class="ca-home-collapse-hdr" onclick="CIASApp.toggleHomeCard('heat')" aria-expanded="false" aria-controls="home-heat-body">
+          <span class="ca-hc-left"><i class="ti ti-chart-bar ca-hc-icon" aria-hidden="true"></i>
+            <span><span class="ca-hc-title">Subject accuracy</span><span class="ca-hc-sub" id="home-heat-sub">Your performance by subject</span></span>
+          </span>
+          <i class="ti ti-chevron-down ca-hc-chev" id="home-heat-chev" aria-hidden="true"></i>
+        </button>
+        <div class="ca-home-collapse-body" id="home-heat-body" style="display:none">
+          <div id="home-heat-bars"></div>
+          <button class="ca-hc-more" onclick="CIASApp.goTab('tutor'); CIASApp.guruTab && CIASApp.guruTab('heat')">Open full heatmap →</button>
+        </div>
+      </div>
+
+      <!-- Collapsible: Prelims rank estimate — real data only -->
+      <div class="ca-home-collapse" id="home-rank-card" style="display:none">
+        <button class="ca-home-collapse-hdr" onclick="CIASApp.toggleHomeCard('rank')" aria-expanded="false" aria-controls="home-rank-body">
+          <span class="ca-hc-left"><i class="ti ti-trophy ca-hc-icon" aria-hidden="true"></i>
+            <span><span class="ca-hc-title">Prelims estimate</span><span class="ca-hc-sub" id="home-rank-sub">Based on your accuracy</span></span>
+          </span>
+          <i class="ti ti-chevron-down ca-hc-chev" id="home-rank-chev" aria-hidden="true"></i>
+        </button>
+        <div class="ca-home-collapse-body" id="home-rank-body" style="display:none">
+          <div class="ca-hc-rank-row">
+            <div class="ca-hc-rank-range" id="home-rank-range">-- – --</div>
+            <div class="ca-hc-rank-meta"><span id="home-rank-conf">--%</span> confidence · marks /200</div>
+          </div>
+          <div id="home-rank-factors"></div>
+          <button class="ca-hc-more" onclick="CIASApp.goTab('tutor'); CIASApp.guruTab && CIASApp.guruTab('rank')">See full breakdown →</button>
+        </div>
+      </div>
     </section>
 
     <!-- VOCAB -->
