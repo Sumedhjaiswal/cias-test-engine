@@ -430,9 +430,20 @@ defined( 'ABSPATH' ) || exit;
         <div class="ca-prof-av" id="prof-av">--</div>
         <div class="ca-prof-name" id="prof-name">Loading...</div>
         <div class="ca-prof-email" id="prof-email">--</div>
+        <div class="ca-prof-meta" id="prof-meta"></div>
         <div class="ca-plan-badge" id="prof-plan"><i class="ti ti-shield-check" aria-hidden="true"></i> <span id="prof-plan-lbl">--</span></div>
       </div>
       <div class="ca-prof-body">
+        <div class="ca-prof-statgrid" id="prof-statgrid">
+          <div class="ca-pstat"><span class="ca-pstat-val" id="ps-tests">--</span><span class="ca-pstat-lbl">Tests taken</span></div>
+          <div class="ca-pstat"><span class="ca-pstat-val" id="ps-avg">--</span><span class="ca-pstat-lbl">Avg score</span></div>
+          <div class="ca-pstat"><span class="ca-pstat-val" id="ps-streak">--</span><span class="ca-pstat-lbl">Day streak</span></div>
+          <div class="ca-pstat"><span class="ca-pstat-val" id="ps-words">--</span><span class="ca-pstat-lbl">Words mastered</span></div>
+        </div>
+        <div class="ca-pf-card">
+          <div class="ca-pf-title"><i class="ti ti-bell" aria-hidden="true" style="font-size:15px;vertical-align:-2px;margin-right:5px"></i>Notifications</div>
+          <div id="prof-notifications"></div>
+        </div>
         <div class="ca-pf-card">
           <div class="ca-pf-hdr-row">
             <div class="ca-pf-title">AI Tutor Credits</div>
