@@ -671,7 +671,7 @@ class CIAS_DB {
                 WHERE ts.user_id=%d";
         $args = [$user_id];
         if ($subject_id) { $sql .= " AND ts.subject_id=%d"; $args[] = $subject_id; }
-        $sql .= " ORDER BY ts.weighted_accuracy ASC";
+        $sql .= " ORDER BY ts.last_attempt DESC";
         return $wpdb->get_results($wpdb->prepare($sql, ...$args));
     }
 
