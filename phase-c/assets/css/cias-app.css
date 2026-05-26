@@ -806,3 +806,8 @@ body.cias-app-page .wp-site-blocks > *:not(:has(.cias-app-shell)) {
 .ca-hist-meta{font-size:11px;color:#9ca3af;margin-top:2px}
 .ca-hist-score{font-size:15px;font-weight:700;flex-shrink:0}
 .ca-hist-rev{flex-shrink:0;font-size:12px;font-weight:600;color:#6c63ff;background:#f3f1ff;border:none;border-radius:8px;padding:7px 12px;cursor:pointer}
+
+/* ── Clickable notifications ── */
+.ca-notif-click{cursor:pointer;border-radius:10px;margin:0 -8px;padding-left:8px;padding-right:8px;transition:background .12s}
+.ca-notif-click:active{background:#f3f1ff}
+.ca-notif-cta{color:#6c63ff;font-weight:600;margin-left:8px}
