@@ -279,13 +279,26 @@ var CIASApp = (function () {
     if (!tasks || !plan.tasks) return;
     var html = '';
     (plan.tasks || []).forEach(function(t) {
-      html += '<div class="ca-plan-task-row">' +
+      var onclick = '', clickable = true;
+      if (t.action === 'practice') {
+        onclick = 'onclick="CIASApp.startAdaptive(' + (t.subject_id||0) + ',0,0,\x27practice\x27)"';
+      } else if (t.action === 'vocab') {
+        onclick = 'onclick="CIASApp.goTab(\x27vocab\x27)"';
+      } else if (t.action === 'test') {
+        onclick = 'onclick="CIASApp.goTab(\x27tests\x27);CIASApp.loadTests()"';
+      } else if (t.action === 'writing') {
+        // Answer writing flow not built yet — guide instead of dead tap.
+        onclick = 'onclick="CIASApp.goTab(\x27tutor\x27)"';
+      } else {
+        clickable = false;
+      }
+      html += '<div class="ca-plan-task-row' + (clickable ? ' ca-plan-task-click' : '') + '" ' + onclick + '>' +
         '<div class="ca-plan-task-icon" style="background:' + (t.icon_bg||'#f3f4f6') + '">' +
         '<i class="ti ' + (t.icon||'ti-check') + '" style="color:' + (t.icon_fg||'#374151') + ';font-size:15px" aria-hidden="true"></i></div>' +
         '<div class="ca-plan-task-body">' +
         '<div class="ca-plan-task-name">' + esc(t.name) + '</div>' +
         '<div class="ca-plan-task-why">' + esc(t.why) + '</div></div>' +
-        '<span class="ca-plan-task-count">' + esc(t.count) + '</span>' +
+        '<span class="ca-plan-task-count">' + esc(t.count) + (clickable ? ' ›' : '') + '</span>' +
         '</div>';
     });
     tasks.innerHTML = html;
