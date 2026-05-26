@@ -928,9 +928,14 @@ var CIASApp = (function () {
       var pct  = Math.round(a.percentage || 0);
       var pass = pct >= 60;
       var color = pass ? '#16a34a' : '#dc2626';
+      // Practice/Drill/Revision titles come prefixed. Anything else is a
+      // teacher-created/class test — show a clear label instead of a bare date.
+      var t = String(a.title || 'Test');
+      var isManaged = /^(Practice|Drill|Revision)\b/.test(t);
+      var title = isManaged ? t : ('Class test · ' + t);
       return '<div class="ca-hist-item">' +
         '<div class="ca-hist-tx">' +
-        '<div class="ca-hist-ttl">' + esc(a.title || 'Test') + '</div>' +
+        '<div class="ca-hist-ttl">' + esc(title) + '</div>' +
         '<div class="ca-hist-meta">' + esc(timeAgo(a.submitted_at)) + ' · ' + (a.score||0) + '/' + (a.total||0) + '</div>' +
         '</div>' +
         '<span class="ca-hist-score" style="color:' + color + '">' + pct + '%</span>' +
