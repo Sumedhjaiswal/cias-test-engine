@@ -254,9 +254,10 @@ var CIASApp = (function () {
     var html = '';
     revs.slice(0, 2).forEach(function(r) {
       var name = (r.subject_name || 'Subject') + (r.topic_name ? ' · ' + r.topic_name : '');
+      var onclick = 'CIASApp.startAdaptive(' + (r.subject_id||0) + ',' + (r.topic_id||0) + ',' + (r.subtopic_id||0) + ',\x27revision\x27)';
       html += dueItemHtml('ti-refresh', '#ecfdf5', '#059669',
-        name, r.reason || 'Due for revision', r.tag || 'review', r.tag_label || 'Review',
-        "CIASApp.goTab('tutor')");
+        name, r.reason || 'Due for revision', r.tag || 'review', r.tag_label || 'Revise',
+        onclick);
     });
     list.innerHTML = html;
   }
@@ -1169,12 +1170,21 @@ var CIASApp = (function () {
     if (nEl) {
       if (notifs.length) {
         nEl.innerHTML = notifs.map(function (n) {
-          return '<div class="ca-notif">' +
+          var clickable = (n.action === 'practice' || n.action === 'revision');
+          var onclick = '', cta = '';
+          if (n.action === 'revision') {
+            onclick = 'onclick="CIASApp.startAdaptive(' + (n.subject_id||0) + ',' + (n.topic_id||0) + ',' + (n.subtopic_id||0) + ',\x27revision\x27)"';
+            cta = '<span class="ca-notif-cta">Revise now →</span>';
+          } else if (n.action === 'practice') {
+            onclick = 'onclick="CIASApp.startAdaptive(' + (n.subject_id||0) + ',' + (n.topic_id||0) + ',' + (n.subtopic_id||0) + ',\x27practice\x27)"';
+            cta = '<span class="ca-notif-cta">Practice now →</span>';
+          }
+          return '<div class="ca-notif' + (clickable ? ' ca-notif-click' : '') + '" ' + onclick + '>' +
             '<div class="ca-notif-ic"><i class="ti ti-' + esc(n.icon || 'bell') + '" aria-hidden="true"></i></div>' +
             '<div class="ca-notif-tx">' +
             '<div class="ca-notif-ttl">' + esc(n.title || '') + '</div>' +
             '<div class="ca-notif-sub">' + esc(n.sub || '') + '</div>' +
-            '<div class="ca-notif-time">' + esc(timeAgo(n.time)) + '</div>' +
+            '<div class="ca-notif-time">' + esc(timeAgo(n.time)) + cta + '</div>' +
             '</div></div>';
         }).join('');
       } else {
