@@ -221,17 +221,37 @@ class CIAS_App_Data {
             }
         }
 
-        // Auto-generated questions ready (pending in-app notices)
+        // Auto-generated questions ready (pending in-app notices) — clickable: opens practice for that subject/topic
         $notices = get_user_meta( $user_id, 'cias_gen_notices', true );
         if ( is_array( $notices ) ) {
             foreach ( $notices as $n ) {
                 $items[] = [
-                    'icon'  => 'bolt',
-                    'title' => 'New questions ready',
-                    'sub'   => $n['message'] ?? 'Fresh questions are available.',
-                    'time'  => $n['created_at'] ?? current_time( 'mysql' ),
+                    'icon'   => 'bolt',
+                    'title'  => 'New questions ready',
+                    'sub'    => $n['message'] ?? 'Fresh questions are available.',
+                    'time'   => $n['created_at'] ?? current_time( 'mysql' ),
+                    'action' => 'practice',
+                    'subject_id'  => intval( $n['subject_id'] ?? 0 ),
+                    'topic_id'    => intval( $n['topic_id'] ?? 0 ),
+                    'subtopic_id' => 0,
                 ];
             }
+        }
+
+        // Revision due (spaced repetition) — clickable: starts revision for that topic
+        $revs = self::get_due_revisions( $user_id );
+        foreach ( (array) $revs as $r ) {
+            $scope = trim( ( $r['subject_name'] ?? '' ) . ( ! empty($r['topic_name']) ? ' › ' . $r['topic_name'] : '' ) );
+            $items[] = [
+                'icon'   => 'refresh',
+                'title'  => 'Revision due',
+                'sub'    => $scope . ' · ' . intval( $r['avg_score'] ?? 0 ) . '% — time to revise',
+                'time'   => $r['last_attempted'] ?? current_time( 'mysql' ),
+                'action' => 'revision',
+                'subject_id'  => intval( $r['subject_id'] ?? 0 ),
+                'topic_id'    => intval( $r['topic_id'] ?? 0 ),
+                'subtopic_id' => intval( $r['subtopic_id'] ?? 0 ),
+            ];
         }
 
         // Sort newest-first, cap at 15
@@ -489,22 +509,24 @@ class CIAS_App_Data {
         // Primary source: cias_topic_stats (always available in main plugin)
         if ( defined('CIAS_TOPIC_STATS') ) {
             $revisions = $wpdb->get_results( $wpdb->prepare(
-                "SELECT ts.subject_id, ts.topic_id,
+                "SELECT ts.subject_id, ts.topic_id, ts.subtopic_id,
                         COALESCE(s.name,'General') AS subject_name,
-                        COALESCE(t.name,'General topic') AS topic_name,
-                        ROUND(COALESCE((ts.correct_count / NULLIF(ts.total_count,0)) * 100, 0)) AS avg_score,
-                        ts.last_seen AS last_attempted,
-                        COALESCE(DATEDIFF(NOW(), ts.last_seen), 999) AS days_since
+                        COALESCE(t.name,'') AS topic_name,
+                        COALESCE(st.name,'') AS subtopic_name,
+                        ROUND(COALESCE((ts.correct_questions / NULLIF(ts.total_questions,0)) * 100, 0)) AS avg_score,
+                        ts.last_attempt AS last_attempted,
+                        COALESCE(DATEDIFF(NOW(), ts.last_attempt), 999) AS days_since
                  FROM " . CIAS_TOPIC_STATS . " ts
                  LEFT JOIN {$wpdb->prefix}cias_subjects s ON s.id = ts.subject_id
                  LEFT JOIN {$wpdb->prefix}cias_topics t ON t.id = ts.topic_id
-                 WHERE ts.user_id = %d AND ts.total_count >= 2
+                 LEFT JOIN {$wpdb->prefix}cias_subtopics st ON st.id = ts.subtopic_id
+                 WHERE ts.user_id = %d AND ts.total_questions >= 2
                    AND (
-                       (ts.correct_count / NULLIF(ts.total_count,0)) < 0.70
-                       OR ts.last_seen < DATE_SUB(NOW(), INTERVAL 5 DAY)
-                       OR ts.last_seen IS NULL
+                       (ts.correct_questions / NULLIF(ts.total_questions,0)) < 0.70
+                       OR ts.last_attempt < DATE_SUB(NOW(), INTERVAL 5 DAY)
+                       OR ts.last_attempt IS NULL
                    )
-                 ORDER BY (ts.correct_count / NULLIF(ts.total_count,0)) ASC, ts.last_seen ASC
+                 ORDER BY (ts.correct_questions / NULLIF(ts.total_questions,0)) ASC, ts.last_attempt ASC
                  LIMIT 4",
                 $user_id
             ), ARRAY_A ) ?: [];
