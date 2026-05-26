@@ -582,11 +582,13 @@ class CIAS_App_Data {
 
         // Find weakest subject
         $weakest = null;
+        $weakest_id = 0;
         $lowest  = 101;
         foreach ( $subject_acc as $sub ) {
             if ( (int)$sub['accuracy'] < $lowest ) {
                 $lowest  = (int)$sub['accuracy'];
                 $weakest = $sub['subject'];
+                $weakest_id = (int)( $sub['subject_id'] ?? 0 );
             }
         }
 
@@ -603,6 +605,8 @@ class CIAS_App_Data {
                 'why'     => "Weakest subject · {$lowest}% accuracy",
                 'count'   => '20 Qs',
                 'est_min' => 30,
+                'action'     => 'practice',
+                'subject_id' => $weakest_id,
             ];
         }
 
@@ -617,6 +621,7 @@ class CIAS_App_Data {
                 'why'     => "{$due_words} word" . ($due_words !== 1 ? 's' : '') . " due for review",
                 'count'   => "{$due_words} words",
                 'est_min' => min( $due_words * 2, 20 ),
+                'action'  => 'vocab',
             ];
         }
 
@@ -632,6 +637,8 @@ class CIAS_App_Data {
                 'why'     => $t['subject_name'] . ' · ' . ($t['q_count'] ?? 20) . ' Qs',
                 'count'   => ($t['q_count'] ?? 20) . ' Qs',
                 'est_min' => $t['time_limit'] ?: 40,
+                'action'  => 'test',
+                'test_id' => intval( $t['id'] ?? 0 ),
             ];
         }
 
@@ -645,6 +652,7 @@ class CIAS_App_Data {
             'why'     => 'Upload 1 handwritten answer for AI evaluation',
             'count'   => '1 answer',
             'est_min' => 20,
+            'action'  => 'writing',
         ];
 
         $total_hrs = round( array_sum( array_column( $tasks, 'est_min' ) ) / 60, 1 );
