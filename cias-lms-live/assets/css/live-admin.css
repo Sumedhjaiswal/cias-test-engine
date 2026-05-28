@@ -1,0 +1,32 @@
+/* CIAS LMS Live Admin */
+.cias-live-admin .cias-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.cias-live-admin .cias-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.cias-live-admin .cias-card h2 {
+    margin: 0 0 16px;
+    font-size: 16px;
+    color: #1e3a5f;
+}
+.cias-live-admin .cias-card-header h2 { margin: 0; }
+.cias-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.cias-badge.green  { background: #dcfce7; color: #166534; }
+.cias-badge.amber  { background: #fef3c7; color: #92400e; }
+.cias-badge.red    { background: #fee2e2; color: #991b1b; }
+.cias-empty { padding: 24px; text-align: center; color: #888; }
