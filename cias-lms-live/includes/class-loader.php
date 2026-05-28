@@ -17,9 +17,7 @@ class Loader {
         require_once CIAS_LIVE_DIR . 'services/live/class-zoom-host-pool.php';
         require_once CIAS_LIVE_DIR . 'services/live/class-live-class-service.php';
         require_once CIAS_LIVE_DIR . 'services/live/class-recording-pipeline.php';
-        require_once CIAS_LIVE_DIR . 'services/live/class-attendance-service.php';
-        require_once CIAS_LIVE_DIR . 'services/live/class-share-service.php';
-        require_once CIAS_LIVE_DIR . 'services/live/class-notification-service.php';
+        require_once CIAS_LIVE_DIR . 'services/live/class-services.php'; // contains ShareService, AttendanceService, NotificationService
     }
 
     private static function load_api(): void {
