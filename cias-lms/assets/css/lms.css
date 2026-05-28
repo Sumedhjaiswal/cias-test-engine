@@ -1,0 +1,91 @@
+/* cias-lms.css — CIAS LMS Student Interface */
+
+.cias-lms-content {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Video player */
+#cias-lms-player {
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.cias-lms-loading {
+    padding: 3rem;
+    text-align: center;
+    color: #888;
+    font-size: 0.95rem;
+}
+
+.cias-lms-error {
+    padding: 2rem;
+    text-align: center;
+    color: #e53e3e;
+    background: #fff5f5;
+    border-radius: 6px;
+    border: 1px solid #feb2b2;
+    font-size: 0.9rem;
+}
+
+/* PDF viewer */
+#cias-lms-pdf-viewer {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+#cias-pdf-canvas-wrapper canvas {
+    border-radius: 4px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+/* Buttons */
+.cias-btn {
+    padding: 6px 16px;
+    background: #1d4ed8;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    transition: background 0.15s;
+}
+.cias-btn:hover:not(:disabled) { background: #1e40af; }
+.cias-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Watermark — ensure it covers Vimeo iframe too */
+#cias-lms-watermark,
+#cias-lms-watermark-2 {
+    pointer-events: none !important;
+    user-select: none !important;
+}
+
+/* Warning overlay */
+#cias-lms-warning h2 { margin: 1rem 0 0.5rem; }
+#cias-lms-warning p  { margin: 0 0 1rem; }
+
+/* Course sidebar / lesson list */
+.cias-lms-sidebar {
+    width: 280px;
+    border-right: 1px solid #e5e7eb;
+    padding: 1rem;
+}
+
+.cias-lesson-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.1s;
+    font-size: 0.9rem;
+}
+.cias-lesson-item:hover { background: #f1f5f9; }
+.cias-lesson-item.active { background: #dbeafe; color: #1d4ed8; }
+.cias-lesson-item.completed::before { content: '✓ '; color: #16a34a; }
