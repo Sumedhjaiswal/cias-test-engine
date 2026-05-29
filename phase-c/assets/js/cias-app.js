@@ -87,6 +87,7 @@ var CIASApp = (function () {
     renderInitialChat();
 
     goTab('home');
+    loadLiveHomeCard();
     checkNotices();
   }
 
@@ -1392,7 +1393,7 @@ var CIASApp = (function () {
   function goTab(t) {
     currentTab = t;
     // All screens — including new exam + results + practice
-    var allScreens = ['home','tests','progress','profile','vocab','tutor','exam','results','practice'];
+    var allScreens = ['home','tests','progress','profile','vocab','tutor','exam','results','practice','live'];
     allScreens.forEach(function(s) {
       var sc = el('scr-' + s);
       if (!sc) return;
@@ -1405,7 +1406,7 @@ var CIASApp = (function () {
 
     // Nav tab highlight — exam/results show Tests as active
     var navTab = (t === 'exam' || t === 'results') ? 'tests' : t;
-    ['home','vocab','tests','tutor','progress','profile'].forEach(function(tab) {
+    ['home','vocab','tests','tutor','progress','profile','live'].forEach(function(tab) {
       var btn = el('tab-' + tab);
       if (btn) {
         btn.classList.toggle('active', tab === navTab);
@@ -1414,6 +1415,7 @@ var CIASApp = (function () {
     });
 
     if (t === 'vocab') { show('vocab-landing'); hide('vocab-session'); }
+    if (t === 'live') { loadLiveClasses(); }
   }
 
   /* ── DOM utilities ───────────────────────────────────────── */
