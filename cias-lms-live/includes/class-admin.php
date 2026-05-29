@@ -11,13 +11,14 @@ class Admin {
     }
 
     public static function register_menu(): void {
-        add_submenu_page(
-            'cias-dashboard',
-            'LMS Live',
+        add_menu_page(
+            'CIAS LMS Live',
             'LMS Live',
             'manage_options',
             'cias-lms-live',
-            [ __CLASS__, 'render_page' ]
+            [ __CLASS__, 'render_page' ],
+            'dashicons-video-alt2',
+            30
         );
     }
 
