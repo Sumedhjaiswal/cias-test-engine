@@ -21,7 +21,9 @@ class Loader {
     }
 
     private static function load_api(): void {
+        require_once CIAS_LIVE_DIR . 'db/class-live-class-db.php';
         require_once CIAS_LIVE_DIR . 'api/class-rest-controller.php';
+        require_once CIAS_LIVE_DIR . 'api/class-live-class-routes.php';
         add_action( 'rest_api_init', [ \CIAS_LIVE\API\RestController::class, 'register_routes' ] );
     }
 

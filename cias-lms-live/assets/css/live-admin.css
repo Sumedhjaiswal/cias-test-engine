@@ -1,32 +1,304 @@
-/* CIAS LMS Live Admin */
-.cias-live-admin .cias-card {
+/* CIAS LMS Live Admin Styles */
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.cias-live-admin { max-width: 1200px; }
+
+.cias-tabs {
+    display: flex;
+    gap: 4px;
+    margin: 16px 0 0;
+    border-bottom: 2px solid #e2e8f0;
+}
+.cias-tab {
+    padding: 10px 20px;
+    border-radius: 6px 6px 0 0;
+    text-decoration: none;
+    color: #64748b;
+    font-weight: 500;
+    font-size: 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-bottom: none;
+    transition: all .15s;
+}
+.cias-tab:hover  { color: #1e40af; background: #eff6ff; }
+.cias-tab.active { color: #1e40af; background: #fff; border-color: #e2e8f0; margin-bottom: -2px; }
+
+.cias-card {
     background: #fff;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
-    padding: 20px 24px;
-    margin-bottom: 20px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    padding: 20px;
+    margin-top: 16px;
 }
-.cias-live-admin .cias-card-header {
+.cias-card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 16px;
 }
-.cias-live-admin .cias-card h2 {
-    margin: 0 0 16px;
-    font-size: 16px;
-    color: #1e3a5f;
-}
-.cias-live-admin .cias-card-header h2 { margin: 0; }
+.cias-card-header h2 { margin: 0; font-size: 16px; }
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
 .cias-badge {
     display: inline-block;
     padding: 2px 10px;
-    border-radius: 12px;
+    border-radius: 20px;
     font-size: 12px;
     font-weight: 600;
 }
 .cias-badge.green  { background: #dcfce7; color: #166534; }
-.cias-badge.amber  { background: #fef3c7; color: #92400e; }
+.cias-badge.amber  { background: #fef9c3; color: #854d0e; }
 .cias-badge.red    { background: #fee2e2; color: #991b1b; }
-.cias-empty { padding: 24px; text-align: center; color: #888; }
+.cias-badge.blue   { background: #dbeafe; color: #1e40af; }
+.cias-badge.grey   { background: #f1f5f9; color: #64748b; }
+.cias-badge.pulse  { animation: pulse 1.5s infinite; }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: .6; }
+}
+
+/* ── Filter bar ──────────────────────────────────────────────────────────── */
+.cias-filter-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.cias-filter-bar select,
+.cias-filter-bar input[type="date"] {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: #374151;
+}
+
+/* ── Classes grid ────────────────────────────────────────────────────────── */
+.cias-date-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    margin: 16px 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #f1f5f9;
+}
+.cias-cards-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+}
+
+.cias-class-card {
+    position: relative;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px;
+    transition: box-shadow .2s;
+}
+.cias-class-card:hover        { box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+.cias-class-card.status-live  { border-color: #22c55e; border-left: 4px solid #22c55e; }
+.cias-class-card.status-cancelled { opacity: .6; }
+
+.cias-countdown {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #7c3aed;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+}
+
+.cias-class-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 4px;
+    padding-right: 80px;
+    line-height: 1.4;
+}
+.cias-class-meta {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-bottom: 8px;
+}
+.cias-class-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 12px;
+    color: #475569;
+    margin-bottom: 8px;
+}
+.cias-class-status { margin-bottom: 10px; }
+
+.cias-class-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 10px;
+}
+
+.cias-icon-btn {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all .15s;
+    line-height: 1;
+}
+.cias-icon-btn:hover { background: #eff6ff; border-color: #bfdbfe; }
+.cias-icon-btn[title]{ position: relative; }
+
+/* ── Tooltip ─────────────────────────────────────────────────────────────── */
+.cias-tooltip {
+    position: fixed;
+    background: #1e293b;
+    color: #fff;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+.cias-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.cias-modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+}
+.cias-modal-box {
+    position: relative;
+    background: #fff;
+    border-radius: 12px;
+    width: 540px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    z-index: 1;
+}
+.cias-modal-sm { width: 420px; }
+
+.cias-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid #e2e8f0;
+}
+.cias-modal-header h3 { margin: 0; font-size: 16px; }
+.cias-modal-close {
+    background: none;
+    border: none;
+    font-size: 22px;
+    color: #94a3b8;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+}
+.cias-modal-close:hover { color: #ef4444; }
+
+.cias-modal-body  { padding: 18px 20px; }
+.cias-modal-footer {
+    padding: 14px 20px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* ── Form ────────────────────────────────────────────────────────────────── */
+.cias-form-row { margin-bottom: 14px; }
+.cias-form-row label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 5px;
+}
+.cias-form-row input[type="text"],
+.cias-form-row input[type="date"],
+.cias-form-row input[type="time"],
+.cias-form-row select {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: #1e293b;
+    box-sizing: border-box;
+}
+.cias-form-row input:focus,
+.cias-form-row select:focus {
+    border-color: #3b82f6;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+}
+.cias-form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.required { color: #ef4444; }
+
+.cias-checkboxes { display: flex; gap: 16px; flex-wrap: wrap; }
+.cias-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: normal !important;
+    cursor: pointer;
+}
+.cias-checkbox-label input { width: auto !important; }
+
+.cias-form-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    margin-top: 10px;
+}
+
+/* ── Detail modal ────────────────────────────────────────────────────────── */
+.cias-detail-grid { display: flex; flex-direction: column; gap: 10px; }
+.cias-detail-row  { display: flex; gap: 12px; align-items: flex-start; }
+.cias-detail-label {
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 600;
+    width: 110px;
+    flex-shrink: 0;
+    padding-top: 1px;
+}
+.cias-detail-value { font-size: 13px; color: #1e293b; }
+
+/* ── States ──────────────────────────────────────────────────────────────── */
+.cias-loading, .cias-empty-state, .cias-error {
+    text-align: center;
+    padding: 40px 20px;
+    color: #94a3b8;
+    font-size: 14px;
+}
+.cias-error { color: #ef4444; }
+body.cias-modal-open { overflow: hidden; }
+
+.spinner { float: none; margin: 0 4px; vertical-align: middle; visibility: visible; }

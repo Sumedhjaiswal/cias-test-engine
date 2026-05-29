@@ -296,4 +296,70 @@ class ZoomHostPool {
     private static function get_callback_url(): string {
         return rest_url( CIAS_LIVE_API_NS . '/' . CIAS_LIVE_API_BASE . '/zoom-callback' );
     }
+
+    // ── Compatibility aliases & new methods ───────────────────────────────────
+
+    /**
+     * Get first available host — checks active status only (scheduling uses time-based conflict check separately)
+     */
+    public static function get_available_host(): ?array {
+        global $wpdb;
+        // Get any connected host (active or locked — we check time conflicts separately)
+        $host = $wpdb->get_row(
+            "SELECT id, display_name, email, status FROM {$wpdb->prefix}cias_zoom_hosts
+             WHERE status IN ('active', 'locked')
+             ORDER BY FIELD(status, 'active', 'locked') ASC, id ASC
+             LIMIT 1",
+            ARRAY_A
+        );
+        return $host ?: null;
+    }
+
+    /**
+     * Create a Zoom meeting for a given host
+     */
+    public static function create_meeting( int $host_id, array $data ): array|\WP_Error {
+        $token = self::get_valid_token( $host_id );
+        if ( is_wp_error( $token ) ) return $token;
+
+        $payload = [
+            'topic'      => $data['topic'] ?? 'CIAS Live Class',
+            'type'       => 2, // scheduled
+            'start_time' => $data['start_time'],
+            'duration'   => $data['duration'] ?? 60,
+            'timezone'   => 'Asia/Kolkata',
+            'settings'   => [
+                'host_video'        => $data['host_video'] ?? true,
+                'participant_video' => false,
+                'mute_upon_entry'   => $data['mute_on_entry'] ?? true,
+                'auto_recording'    => $data['auto_recording'] ?? 'none',
+                'join_before_host'  => true,
+            ],
+        ];
+
+        $result = self::api_post( '/users/me/meetings', $payload, $token );
+        if ( is_wp_error( $result ) ) return $result;
+
+        return [
+            'id'        => $result['id'],
+            'join_url'  => $result['join_url'],
+            'start_url' => $result['start_url'],
+        ];
+    }
+
+    /**
+     * Delete a Zoom meeting
+     */
+    public static function delete_meeting( int $host_id, string $meeting_id ): bool {
+        $token = self::get_valid_token( $host_id );
+        if ( is_wp_error( $token ) ) return false;
+
+        $response = wp_remote_request( self::ZOOM_API_BASE . '/meetings/' . $meeting_id, [
+            'method'  => 'DELETE',
+            'headers' => [ 'Authorization' => 'Bearer ' . $token ],
+        ] );
+
+        return ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) === 204;
+    }
+
 }

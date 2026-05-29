@@ -3,185 +3,219 @@ namespace CIAS_LIVE\Services;
 
 defined( 'ABSPATH' ) || exit;
 
+use CIAS_LIVE\DB\LiveClassDB;
+
 class LiveClassService {
 
     /**
-     * Create a live class — auto-assigns Zoom host, creates Zoom meeting.
+     * Create a new live class — auto-assigns a free Zoom host
      */
-    public static function create( array $data, int $created_by ): array|\WP_Error {
-        global $wpdb;
+    public static function create( array $data ): array {
 
-        $title        = sanitize_text_field( $data['title'] ?? '' );
-        $batch_id     = (int) ( $data['batch_id'] ?? 0 );
-        $course_id    = (int) ( $data['course_id'] ?? 0 );
-        $teacher_id   = (int) ( $data['teacher_id'] ?? 0 );
-        $start_time   = sanitize_text_field( $data['start_time'] ?? '' );
-        $duration     = (int) ( $data['duration_mins'] ?? 60 );
-        $auto_record  = (bool) ( $data['auto_recording'] ?? true );
-        $share_mode   = in_array( $data['share_mode'] ?? 'batch', [ 'batch', 'enrolled', 'link' ], true )
-                        ? $data['share_mode'] : 'batch';
-
-        if ( ! $title || ! $batch_id || ! $course_id || ! $teacher_id || ! $start_time ) {
-            return new \WP_Error( 'invalid_params', 'title, batch_id, course_id, teacher_id, start_time required.', [ 'status' => 400 ] );
+        // 1. Validate required fields
+        $required = [ 'title', 'batch_id', 'teacher_id', 'start_time', 'end_time' ];
+        foreach ( $required as $field ) {
+            if ( empty( $data[ $field ] ) ) {
+                return [ 'success' => false, 'message' => "Missing required field: {$field}" ];
+            }
         }
 
-        $end_time = gmdate( 'Y-m-d H:i:s', strtotime( $start_time ) + ( $duration * 60 ) );
+        // 2. Parse times
+        $start = strtotime( $data['start_time'] );
+        $end   = strtotime( $data['end_time'] );
 
-        // Auto-assign Zoom host
-        $host_id = ZoomHostPool::assign_host( $start_time, $end_time );
-        if ( is_wp_error( $host_id ) ) return $host_id;
+        if ( ! $start || ! $end || $end <= $start ) {
+            return [ 'success' => false, 'message' => 'Invalid start or end time.' ];
+        }
 
-        // Get valid access token
-        $access_token = ZoomHostPool::get_valid_token( $host_id );
-        if ( is_wp_error( $access_token ) ) return $access_token;
+        $duration = (int) round( ( $end - $start ) / 60 ); // minutes
 
-        // Create Zoom meeting
-        $meeting = ZoomHostPool::api_post( '/users/me/meetings', [
-            'topic'    => '[CIAS] ' . $title,
-            'type'     => 2, // scheduled
-            'start_time' => gmdate( 'Y-m-d\TH:i:s', strtotime( $start_time ) ),
-            'duration' => $duration,
-            'timezone' => 'Asia/Kolkata',
-            'settings' => [
-                'waiting_room'         => true,
-                'join_before_host'     => false,
-                'mute_upon_entry'      => true,
-                'auto_recording'       => $auto_record ? 'cloud' : 'none',
-                'participant_video'    => false,
-                'host_video'           => true,
-                'approval_type'        => 2, // no registration required
-            ],
-        ], $access_token );
+        // 3. Get an available Zoom host
+        $host = ZoomHostPool::get_available_host();
+        if ( ! $host ) {
+            return [
+                'success' => false,
+                'message' => 'All Zoom accounts are currently in use. Please choose a different time or wait for an ongoing class to finish.',
+            ];
+        }
 
-        if ( is_wp_error( $meeting ) ) return $meeting;
+        // 4. Check for time conflict on this host
+        if ( self::host_has_conflict( $host['id'], $data['start_time'], $data['end_time'] ) ) {
+            return [
+                'success' => false,
+                'message' => 'Selected Zoom account has a conflicting class at this time.',
+            ];
+        }
 
-        // Save to DB
-        $wpdb->insert( $wpdb->prefix . 'cias_live_classes', [
-            'title'           => $title,
-            'batch_id'        => $batch_id,
-            'course_id'       => $course_id,
-            'teacher_id'      => $teacher_id,
-            'zoom_host_id'    => $host_id,
-            'zoom_meeting_id' => (string) $meeting['id'],
-            'join_url'        => $meeting['join_url'],
-            'start_time'      => $start_time,
-            'end_time'        => $end_time,
-            'duration_mins'   => $duration,
-            'auto_recording'  => (int) $auto_record,
-            'share_mode'      => $share_mode,
-            'created_by'      => $created_by,
+        // 5. Get batch + teacher names for denormalized storage
+        $batch_name   = self::get_batch_name( (int) $data['batch_id'] );
+        $teacher_name = self::get_teacher_name( (int) $data['teacher_id'] );
+
+        // 6. Create Zoom meeting
+        $zoom_result = ZoomHostPool::create_meeting( $host['id'], [
+            'topic'          => sanitize_text_field( $data['title'] ),
+            'start_time'     => gmdate( 'Y-m-d\TH:i:s', $start ),
+            'duration'       => $duration,
+            'auto_recording' => ! empty( $data['auto_recording'] ) ? 'cloud' : 'none',
+            'host_video'     => ! empty( $data['host_video'] ),
+            'mute_on_entry'  => ! empty( $data['mute_on_entry'] ) !== false,
         ] );
 
-        $class_id = $wpdb->insert_id;
+        if ( is_wp_error( $zoom_result ) ) {
+            return [ 'success' => false, 'message' => $zoom_result->get_error_message() ];
+        }
 
-        // Pre-populate attendance records for all enrolled students
-        self::seed_attendance( $class_id, $batch_id );
+        // 7. Save to DB (lock happens only when class goes live, not on schedule)
+        $class_id = LiveClassDB::insert( [
+            'title'           => sanitize_text_field( $data['title'] ),
+            'batch_id'        => (int) $data['batch_id'],
+            'batch_name'      => $batch_name,
+            'teacher_id'      => (int) $data['teacher_id'],
+            'teacher_name'    => $teacher_name,
+            'host_id'         => (int) $host['id'],
+            'zoom_account'    => $host['display_name'] . ' (' . $host['email'] . ')',
+            'zoom_meeting_id' => (string) $zoom_result['id'],
+            'zoom_session_id' => (string) $zoom_result['id'],
+            'join_url'        => $zoom_result['join_url'],
+            'start_url'       => $zoom_result['start_url'],
+            'start_time'      => gmdate( 'Y-m-d H:i:s', $start ),
+            'end_time'        => gmdate( 'Y-m-d H:i:s', $end ),
+            'duration'        => $duration,
+            'auto_recording'  => ! empty( $data['auto_recording'] ) ? 1 : 0,
+            'host_video'      => ! empty( $data['host_video'] ) ? 1 : 0,
+            'mute_on_entry'   => isset( $data['mute_on_entry'] ) ? 1 : 0,
+            'status'          => 'scheduled',
+            'created_by'      => get_current_user_id(),
+        ] );
 
-        // Send WhatsApp notification to students
-        NotificationService::class_scheduled( $class_id );
+        if ( ! $class_id ) {
+            return [ 'success' => false, 'message' => 'Failed to save class to database.' ];
+        }
 
         return [
-            'class_id'   => $class_id,
-            'join_url'   => $meeting['join_url'],
-            'start_time' => $start_time,
-            'host_email' => self::get_host_email( $host_id ),
+            'success'  => true,
+            'class_id' => $class_id,
+            'message'  => 'Class scheduled successfully.',
+            'data'     => LiveClassDB::get_class( $class_id ),
         ];
     }
 
     /**
-     * Cancel a live class.
+     * Update an existing class (only if not yet started)
      */
-    public static function cancel( int $class_id, int $by ): bool|\WP_Error {
-        global $wpdb;
-
-        $class = $wpdb->get_row( $wpdb->prepare(
-            "SELECT * FROM {$wpdb->prefix}cias_live_classes WHERE id = %d", $class_id
-        ) );
-
-        if ( ! $class ) return new \WP_Error( 'not_found', 'Class not found.', [ 'status' => 404 ] );
-        if ( $class->status === 'completed' ) return new \WP_Error( 'invalid', 'Cannot cancel a completed class.' );
-
-        // Delete Zoom meeting
-        $access_token = ZoomHostPool::get_valid_token( $class->zoom_host_id );
-        if ( ! is_wp_error( $access_token ) ) {
-            wp_remote_request( "https://api.zoom.us/v2/meetings/{$class->zoom_meeting_id}", [
-                'method'  => 'DELETE',
-                'headers' => [ 'Authorization' => 'Bearer ' . $access_token ],
-            ] );
+    public static function update( int $class_id, array $data ): array {
+        $class = LiveClassDB::get_class( $class_id );
+        if ( ! $class ) {
+            return [ 'success' => false, 'message' => 'Class not found.' ];
+        }
+        if ( in_array( $class['status'], [ 'live', 'completed', 'cancelled' ] ) ) {
+            return [ 'success' => false, 'message' => 'Cannot edit a class that is live, completed or cancelled.' ];
         }
 
-        $wpdb->update(
-            $wpdb->prefix . 'cias_live_classes',
-            [ 'status' => 'cancelled' ],
-            [ 'id' => $class_id ]
-        );
+        $update = [];
+        if ( ! empty( $data['title'] ) )       $update['title']        = sanitize_text_field( $data['title'] );
+        if ( ! empty( $data['batch_id'] ) ) {
+            $update['batch_id']   = (int) $data['batch_id'];
+            $update['batch_name'] = self::get_batch_name( (int) $data['batch_id'] );
+        }
+        if ( ! empty( $data['teacher_id'] ) ) {
+            $update['teacher_id']   = (int) $data['teacher_id'];
+            $update['teacher_name'] = self::get_teacher_name( (int) $data['teacher_id'] );
+        }
+        if ( ! empty( $data['start_time'] ) )  $update['start_time']   = $data['start_time'];
+        if ( ! empty( $data['end_time'] ) )     $update['end_time']     = $data['end_time'];
+        if ( isset( $data['auto_recording'] ) ) $update['auto_recording'] = (int) $data['auto_recording'];
+        if ( isset( $data['host_video'] ) )     $update['host_video']   = (int) $data['host_video'];
+        if ( isset( $data['mute_on_entry'] ) )  $update['mute_on_entry'] = (int) $data['mute_on_entry'];
 
-        NotificationService::class_cancelled( $class_id );
-        return true;
+        LiveClassDB::update( $class_id, $update );
+
+        return [ 'success' => true, 'message' => 'Class updated.', 'data' => LiveClassDB::get_class( $class_id ) ];
     }
 
     /**
-     * Get upcoming classes for a batch.
+     * Cancel a class — unlock the Zoom host
      */
-    public static function get_upcoming( int $batch_id ): array {
-        global $wpdb;
-        return $wpdb->get_results( $wpdb->prepare(
-            "SELECT lc.id, lc.title, lc.join_url, lc.start_time, lc.end_time,
-                    lc.duration_mins, lc.status, lc.recording_status, lc.share_mode,
-                    u.display_name AS teacher_name
-             FROM {$wpdb->prefix}cias_live_classes lc
-             LEFT JOIN {$wpdb->users} u ON u.ID = lc.teacher_id
-             WHERE lc.batch_id = %d AND lc.status IN ('scheduled','live')
-             AND lc.start_time >= NOW()
-             ORDER BY lc.start_time ASC",
-            $batch_id
-        ), ARRAY_A ) ?: [];
+    public static function cancel( int $class_id ): array {
+        $class = LiveClassDB::get_class( $class_id );
+        if ( ! $class ) {
+            return [ 'success' => false, 'message' => 'Class not found.' ];
+        }
+        if ( $class['status'] === 'cancelled' ) {
+            return [ 'success' => false, 'message' => 'Class already cancelled.' ];
+        }
+
+        // Delete from Zoom
+        if ( ! empty( $class['zoom_meeting_id'] ) ) {
+            ZoomHostPool::delete_meeting( (int) $class['host_id'], $class['zoom_meeting_id'] );
+        }
+
+        // Unlock host
+        if ( ! empty( $class['host_id'] ) ) {
+            ZoomHostPool::unlock_host( (int) $class['host_id'] );
+        }
+
+        LiveClassDB::update( $class_id, [ 'status' => 'cancelled' ] );
+
+        return [ 'success' => true, 'message' => 'Class cancelled and Zoom host released.' ];
     }
 
     /**
-     * Get past classes with recordings for a batch.
+     * Get classes for student app — only their batch, upcoming + today
      */
-    public static function get_past( int $batch_id ): array {
+    public static function get_for_student( int $user_id ): array {
         global $wpdb;
+
+        // Get student's batch IDs from cias_enrollments
+        $batch_ids = $wpdb->get_col( $wpdb->prepare(
+            "SELECT batch_id FROM {$wpdb->prefix}cias_enrollments WHERE user_id = %d AND status = 'active'",
+            $user_id
+        ) );
+
+        if ( empty( $batch_ids ) ) return [];
+
+        $placeholders = implode( ',', array_fill( 0, count( $batch_ids ), '%d' ) );
+        $table        = $wpdb->prefix . 'cias_live_classes';
+        $now          = current_time( 'mysql' );
+
         return $wpdb->get_results( $wpdb->prepare(
-            "SELECT lc.id, lc.title, lc.start_time, lc.duration_mins,
-                    lc.recording_status, lr.vimeo_video_id,
-                    u.display_name AS teacher_name
-             FROM {$wpdb->prefix}cias_live_classes lc
-             LEFT JOIN {$wpdb->prefix}cias_live_recordings lr ON lr.live_class_id = lc.id
-             LEFT JOIN {$wpdb->users} u ON u.ID = lc.teacher_id
-             WHERE lc.batch_id = %d AND lc.status = 'completed'
-             ORDER BY lc.start_time DESC",
-            $batch_id
+            "SELECT id, title, batch_name, teacher_name, zoom_account, join_url,
+                    start_time, end_time, duration, status, recording_url
+             FROM {$table}
+             WHERE batch_id IN ({$placeholders})
+               AND status IN ('scheduled','live')
+               AND end_time >= %s
+             ORDER BY start_time ASC
+             LIMIT 20",
+            ...[...$batch_ids, $now]
         ), ARRAY_A ) ?: [];
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Helpers ────────────────────────────────────────────────────────────
 
-    private static function seed_attendance( int $class_id, int $batch_id ): void {
+    private static function get_batch_name( int $batch_id ): string {
         global $wpdb;
-
-        // Get all active students in this batch
-        $students = $wpdb->get_col( $wpdb->prepare(
-            "SELECT student_id FROM {$wpdb->prefix}cias_lms_enrollments
-             WHERE batch_id = %d AND status = 'active'",
-            $batch_id
+        return (string) $wpdb->get_var( $wpdb->prepare(
+            "SELECT name FROM {$wpdb->prefix}cias_batches WHERE id = %d", $batch_id
         ) );
-
-        foreach ( $students as $student_id ) {
-            $wpdb->insert( $wpdb->prefix . 'cias_live_attendance', [
-                'live_class_id' => $class_id,
-                'student_id'    => $student_id,
-                'batch_id'      => $batch_id,
-                'status'        => 'absent',
-            ] );
-        }
     }
 
-    private static function get_host_email( int $host_id ): string {
+    private static function get_teacher_name( int $user_id ): string {
+        $user = get_userdata( $user_id );
+        return $user ? $user->display_name : '';
+    }
+
+    private static function host_has_conflict( int $host_id, string $start, string $end ): bool {
         global $wpdb;
-        return $wpdb->get_var( $wpdb->prepare(
-            "SELECT email FROM {$wpdb->prefix}cias_zoom_hosts WHERE id = %d", $host_id
-        ) ) ?? '';
+        $table = $wpdb->prefix . 'cias_live_classes';
+        $count = $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table}
+             WHERE host_id = %d
+               AND status IN ('scheduled','live')
+               AND start_time < %s
+               AND end_time   > %s",
+            $host_id, $end, $start
+        ) );
+        return (int) $count > 0;
     }
 }
