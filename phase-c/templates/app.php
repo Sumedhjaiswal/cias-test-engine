@@ -80,6 +80,15 @@ defined( 'ABSPATH' ) || exit;
           <div class="ca-act-sub">Rank in your batch</div>
         </button>
 
+        <button class="ca-act-card ca-act-red ca-act-live-btn" onclick="CIASApp.goTab('live')" aria-label="Live Classes" id="live-home-card">
+          <div class="ca-act-top">
+            <i class="ti ti-video ca-act-icon" aria-hidden="true"></i>
+            <span class="ca-act-pill ca-live-pill" id="live-home-pill">LIVE</span>
+          </div>
+          <div class="ca-act-name">Live Classes</div>
+          <div class="ca-act-sub" id="live-home-sub">Loading...</div>
+        </button>
+
       </div>
       <!-- Due Today: vocab + tests + revisions -->
       <div class="ca-sec-hdr">
@@ -466,6 +475,39 @@ defined( 'ABSPATH' ) || exit;
           <div id="credit-history"></div>
         </div>
       </div>
+    </section>
+
+
+    <!-- ── LIVE CLASSES SCREEN ─────────────────────────────── -->
+    <section class="ca-screen ca-screen-live" id="scr-live" aria-label="Live Classes" style="display:none">
+
+      <div class="ca-live-header">
+        <h2 class="ca-live-title">Live Classes</h2>
+        <span class="ca-live-live-dot" id="live-dot" style="display:none">
+          <span class="ca-pulse-dot"></span> Live Now
+        </span>
+      </div>
+
+      <!-- Upcoming classes -->
+      <div class="ca-live-section">
+        <div class="ca-live-sec-label">Upcoming</div>
+        <div id="live-upcoming-list" class="ca-live-list">
+          <div class="ca-live-loading">Loading classes...</div>
+        </div>
+      </div>
+
+      <!-- Past classes with recordings -->
+      <div class="ca-live-section" id="live-past-section" style="display:none">
+        <div class="ca-live-sec-label">Recordings</div>
+        <div id="live-past-list" class="ca-live-list"></div>
+      </div>
+
+      <div id="live-empty" class="ca-live-empty" style="display:none">
+        <i class="ti ti-video-off"></i>
+        <p>No upcoming classes scheduled for your batch.</p>
+        <p class="ca-live-empty-sub">Check back soon!</p>
+      </div>
+
     </section>
 
   </main>
